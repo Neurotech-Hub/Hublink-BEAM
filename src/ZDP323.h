@@ -4,9 +4,6 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-// Pin Definitions
-#define ZDP323_TRIGGER_PIN A4 // Default trigger pin
-
 // Device addresses
 #define ZDP323_I2C_GENERAL_CALL 0x00 // General Call address for single-sensor setup
 #define ZDP323_I2C_ADDRESS ZDP323_I2C_GENERAL_CALL
@@ -35,8 +32,8 @@
 #define ZDP323_CONFIG_FILSEL_MASK 0x07
 
 // Timing constants
-#define ZDP323_TSTAB_MS 3000 // Stability time (30 seconds)
-#define ZDP323_TCYC_MS 10    // Minimum time between peak hold reads
+#define ZDP323_TSTAB_MS 10000 // Stability time (30 seconds)
+#define ZDP323_TCYC_MS 10     // Minimum time between peak hold reads
 
 class ZDP323
 {
@@ -58,6 +55,7 @@ public:
 private:
     static void IRAM_ATTR handleInterrupt();
     static volatile bool _motionDetected;
+    static volatile uint8_t _triggerPin;
     bool readPeakHold(int16_t *peakHold); // Read the peak hold value
 
     struct Config
@@ -72,7 +70,6 @@ private:
     uint8_t _i2cAddress;
     bool _initialized;
     unsigned long _lastPeakHoldRead;
-    uint8_t _triggerPin; // Store the trigger pin
 };
 
 #endif

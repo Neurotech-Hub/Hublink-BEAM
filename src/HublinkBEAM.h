@@ -13,10 +13,10 @@
 #include <Adafruit_NeoPixel.h>
 
 // Pin Definitions
-#define PIN_SD_CS 12       // SD card chip select
-#define PIN_SD_DET 11      // SD card detection pin
-#define PIN_GREEN_LED 5    // On-board green LED
-#define PIN_PIR_TRIGGER A4 // PIR trigger pin (shared with I2C SDA)
+#define PIN_SD_CS 12        // SD card chip select
+#define PIN_SD_DET 11       // SD card detection pin
+#define PIN_GREEN_LED 5     // On-board green LED
+#define PIN_PIR_TRIGGER SDA // PIR trigger pin (shared with I2C SDA)
 
 // NeoPixel Colors
 #define NEOPIXEL_OFF 0x000000
