@@ -16,8 +16,6 @@
 #define PIN_SD_CS 12       // SD card chip select
 #define PIN_SD_DET 11      // SD card detection pin
 #define PIN_GREEN_LED 5    // On-board green LED
-#define PIN_NEOPIXEL 6     // NeoPixel LED pin
-#define NEOPIXEL_POWER 7   // NeoPixel power control pin
 #define PIN_PIR_TRIGGER A4 // PIR trigger pin (shared with I2C SDA)
 
 // NeoPixel Colors

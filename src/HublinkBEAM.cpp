@@ -31,20 +31,6 @@ void HublinkBEAM::initPins()
     _pixel.show();            // Initialize all pixels to 'off'
 }
 
-void HublinkBEAM::setNeoPixel(uint32_t color)
-{
-    digitalWrite(NEOPIXEL_POWER, HIGH);
-    _pixel.setPixelColor(0, color);
-    _pixel.show();
-}
-
-void HublinkBEAM::disableNeoPixel()
-{
-    _pixel.setPixelColor(0, NEOPIXEL_OFF);
-    _pixel.show();
-    digitalWrite(NEOPIXEL_POWER, LOW);
-}
-
 bool HublinkBEAM::begin()
 {
     bool allInitialized = true;
@@ -74,72 +60,72 @@ bool HublinkBEAM::begin()
     }
 
     // Initialize battery monitor
-    Serial.print("Initializing battery monitor... ");
-    if (!_batteryMonitor.begin(&Wire))
-    {
-        Serial.println("FAILED");
-        Serial.println("Could not find a valid MAX17048 sensor");
-        allInitialized = false;
-    }
-    else
-    {
-        _isBatteryMonitorInitialized = true;
-        Serial.println("OK");
-        Serial.printf("Battery: %.2fV (%.1f%%)\n",
-                      _batteryMonitor.cellVoltage(),
-                      _batteryMonitor.cellPercent());
-    }
+    // Serial.print("Initializing battery monitor... ");
+    // if (!_batteryMonitor.begin(&Wire))
+    // {
+    //     Serial.println("FAILED");
+    //     Serial.println("Could not find a valid MAX17048 sensor");
+    //     allInitialized = false;
+    // }
+    // else
+    // {
+    //     _isBatteryMonitorInitialized = true;
+    //     Serial.println("OK");
+    //     Serial.printf("Battery: %.2fV (%.1f%%)\n",
+    //                   _batteryMonitor.cellVoltage(),
+    //                   _batteryMonitor.cellPercent());
+    // }
 
-    // Initialize environmental sensor
-    Serial.print("Initializing environmental sensor... ");
-    if (!_envSensor.begin())
-    {
-        Serial.println("FAILED");
-        allInitialized = false;
-    }
-    else
-    {
-        _isEnvSensorInitialized = true;
-        Serial.println("OK");
-    }
+    // // Initialize environmental sensor
+    // Serial.print("Initializing environmental sensor... ");
+    // if (!_envSensor.begin())
+    // {
+    //     Serial.println("FAILED");
+    //     allInitialized = false;
+    // }
+    // else
+    // {
+    //     _isEnvSensorInitialized = true;
+    //     Serial.println("OK");
+    // }
 
-    // Initialize light sensor
-    Serial.print("Initializing light sensor... ");
-    if (!_lightSensor.begin())
-    {
-        Serial.println("FAILED");
-        allInitialized = false;
-    }
-    else
-    {
-        _isLightSensorInitialized = true;
-        Serial.println("OK");
-    }
+    // // Initialize light sensor
+    // Serial.print("Initializing light sensor... ");
+    // if (!_lightSensor.begin())
+    // {
+    //     Serial.println("FAILED");
+    //     allInitialized = false;
+    // }
+    // else
+    // {
+    //     _isLightSensorInitialized = true;
+    //     Serial.println("OK");
+    // }
 
-    // Initialize RTC
-    Serial.print("Initializing RTC... ");
-    if (!_rtc.begin())
-    {
-        Serial.println("FAILED");
-        allInitialized = false;
-    }
-    else
-    {
-        _isRTCInitialized = true;
-        Serial.println("OK");
-    }
+    // // Initialize RTC
+    // Serial.print("Initializing RTC... ");
+    // if (!_rtc.begin())
+    // {
+    //     Serial.println("FAILED");
+    //     allInitialized = false;
+    // }
+    // else
+    // {
+    //     _isRTCInitialized = true;
+    //     Serial.println("OK");
+    // }
 
-    // Initialize SD card
-    Serial.print("Initializing SD card... ");
-    if (!initSD())
-    {
-        Serial.println("FAILED");
-        allInitialized = false;
-    }
-    else
-    {
-        Serial.println("OK");
-    }
+    // // Initialize SD card
+    // Serial.print("Initializing SD card... ");
+    // if (!initSD())
+    // {
+    //     Serial.println("FAILED");
+    //     allInitialized = false;
+    // }
+    // else
+    // {
+    //     Serial.println("OK");
+    // }
 
     Serial.println("\nInitialization Summary:");
     Serial.println("----------------------");
@@ -164,6 +150,20 @@ bool HublinkBEAM::begin()
     }
 
     return allInitialized;
+}
+
+void HublinkBEAM::setNeoPixel(uint32_t color)
+{
+    digitalWrite(NEOPIXEL_POWER, HIGH);
+    _pixel.setPixelColor(0, color);
+    _pixel.show();
+}
+
+void HublinkBEAM::disableNeoPixel()
+{
+    _pixel.setPixelColor(0, NEOPIXEL_OFF);
+    _pixel.show();
+    digitalWrite(NEOPIXEL_POWER, LOW);
 }
 
 bool HublinkBEAM::initSD()

@@ -22,7 +22,7 @@ ZDP323::ZDP323(uint8_t i2cAddress)
 bool ZDP323::begin(TwoWire &wirePort)
 {
     _wire = &wirePort;
-    _wire->setTimeout(3000); // Set timeout to 3ms
+    _wire->setTimeout(3000);
 
     // Step 1: Wait for power-on stabilization
     delay(500);
@@ -30,106 +30,86 @@ bool ZDP323::begin(TwoWire &wirePort)
     Serial.println("Initializing PIR sensor...");
 
     // Step 2: Initial configuration with maximum threshold
-    _config.detlvl = 0xFF; // Maximum threshold for initial setup
+    _config.detlvl = 0xFF;
     _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
-    _config.fstep = ZDP323_CONFIG_FSTEP_2;        // Default filter step
-    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_B; // Default filter type
+    _config.fstep = ZDP323_CONFIG_FSTEP_2;
+    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_B;
 
     // Step 3 & 4: Write config and check Peak Hold until stable
-    bool stable = false;
     const int maxAttempts = 10;
     int attempts = 0;
     int configFailures = 0;
-    const int maxConfigFailures = 3; // Allow up to 3 writeConfig failures per attempt
+    const int maxConfigFailures = 3;
 
-    while (!stable && attempts < maxAttempts)
+    while (attempts < maxAttempts)
     {
-        Serial.printf("Configuration attempt %d of %d\n", attempts + 1, maxAttempts);
+        Serial.printf("Config attempt %d/%d\n", attempts + 1, maxAttempts);
 
         if (!writeConfig())
         {
             configFailures++;
-            Serial.printf("Failed to write configuration (failure %d of %d)\n",
-                          configFailures, maxConfigFailures);
+            Serial.printf("Config write failed (%d/%d)\n", configFailures, maxConfigFailures);
 
             if (configFailures >= maxConfigFailures)
             {
-                Serial.println("Exceeded maximum configuration failures");
+                Serial.println("Max config failures exceeded");
                 return false;
             }
-
-            delay(100); // Short delay before retry
-            continue;   // Try the same attempt again
+            delay(100);
+            continue;
         }
 
-        // Reset config failures counter on successful write
-        configFailures = 0;
+        // Wait for a full cycle before reading
+        delay(ZDP323_TCYC_MS);
 
         // Read Peak Hold value
         int16_t peakHold;
         if (!readPeakHold(&peakHold))
         {
-            Serial.println("Failed to read peak hold value");
-            attempts++; // Count this as a failed attempt
-            continue;   // Move to next attempt
+            Serial.println("Peak hold read failed");
+            attempts++;
+            continue;
         }
 
         // Check if below half threshold
         int16_t halfThreshold = (0xFF * 8) / 2;
-        Serial.printf("Peak Hold: %d, Half Threshold: %d\n", peakHold, halfThreshold);
+        Serial.printf("Peak hold: %d (threshold: ±%d)\n", peakHold, halfThreshold);
 
         if (abs(peakHold) < halfThreshold)
         {
-            stable = true;
+            // Stable reading achieved, proceed to final config
+            Serial.println("Stable reading achieved");
+            break;
         }
-        else
-        {
-            delay(ZDP323_TCYC_MS);
-            attempts++;
-        }
+
+        attempts++;
+        delay(ZDP323_TCYC_MS);
     }
 
-    if (!stable)
+    if (attempts >= maxAttempts)
     {
         Serial.println("Failed to achieve stable reading");
         return false;
     }
 
-    // Step 5: Write final configuration with desired threshold and enable trigger mode
+    // Step 5: Write final configuration with desired threshold
     _config.detlvl = ZDP323_CONFIG_DETLVL_DEFAULT;
-    _config.trigom = ZDP323_CONFIG_TRIGOM_ENABLED;
-    Serial.println("Writing final configuration with trigger mode enabled...");
+    Serial.println("Writing final config...");
 
-    // Final configuration must succeed
-    configFailures = 0;
-    while (configFailures < maxConfigFailures)
+    if (!writeConfig())
     {
-        if (writeConfig())
-        {
-            break;
-        }
-        configFailures++;
-        Serial.printf("Failed to write final configuration (attempt %d of %d)\n",
-                      configFailures, maxConfigFailures);
-        delay(100);
-    }
-
-    if (configFailures >= maxConfigFailures)
-    {
-        Serial.println("Failed to write final configuration after all attempts");
+        Serial.println("Final config write failed");
         return false;
     }
 
     // Step 6: Wait for sensor stability
-    Serial.println("Waiting for sensor stability...");
+    Serial.println("Waiting for stability...");
     delay(ZDP323_TSTAB_MS);
 
-    // Step 7: Setup interrupt for motion detection
     _initialized = true;
     _motionDetected = false;
-    attachInterrupt(digitalPinToInterrupt(ZDP323_TRIGGER_PIN), handleInterrupt, FALLING);
 
-    Serial.println("Successfully initialized PIR sensor");
+    Serial.println("PIR sensor init OK");
     return true;
 }
 
@@ -138,36 +118,62 @@ bool ZDP323::writeConfig()
     // Configuration is 56 bits (7 bytes) sent MSB first
     uint8_t data[7] = {0}; // All reserved bits default to 0
 
-    // Byte 3: FILSEL (bits 26-28), FSTEP (bits 24-25), TRIGOM (bit 23)
+    // Byte 3: FILSEL (bits 26-28), FSTEP (bits 24-25)
     data[3] = ((_config.filsel & ZDP323_CONFIG_FILSEL_MASK) << 2) |
               (_config.fstep & ZDP323_CONFIG_FSTEP_MASK);
 
     // Byte 4: TRIGOM (bit 23) and upper bits of DETLVL (bits 22-16)
-    // DETLVL is split across bytes 4 and 5
-    // Byte 4 gets bits 22-16 (7 bits)
     data[4] = ((_config.trigom & ZDP323_CONFIG_TRIGOM_MASK) << 7) |
-              (_config.detlvl >> 1); // Upper 7 bits of DETLVL
+              (_config.detlvl >> 1);
 
     // Byte 5: Lower bit of DETLVL (bit 15) and reserved bits
-    data[5] = (_config.detlvl & 0x01) << 7; // LSb of DETLVL in MSb position
+    data[5] = (_config.detlvl & 0x01) << 7;
 
-    Serial.println("Writing configuration data (56 bits):");
-    Serial.printf("FILSEL = %d, FSTEP = %d, TRIGOM = %d, DETLVL = %d (threshold = ±%d ADC)\n",
-                  _config.filsel, _config.fstep, _config.trigom, _config.detlvl,
-                  _config.detlvl * 8);
-    // Write configuration using General Call address
+    Serial.println("\nWriting configuration:");
+    Serial.printf("FILSEL = %d, FSTEP = %d, TRIGOM = %d, DETLVL = %d\n",
+                  _config.filsel, _config.fstep, _config.trigom, _config.detlvl);
+
+    for (int i = 0; i < 7; i++)
+    {
+        Serial.printf("Byte %d = 0b", i);
+        for (int bit = 7; bit >= 0; bit--)
+        {
+            Serial.print((data[i] >> bit) & 0x01);
+        }
+        Serial.println();
+    }
+
+    // Start transmission
     _wire->beginTransmission(_i2cAddress);
     _wire->write(data, 7);
     uint8_t result = _wire->endTransmission(true);
 
-    if (result != 0)
+    switch (result)
     {
-        Serial.printf("Configuration write failed with error code: %d\n", result);
-        return false;
+    case 0:
+        Serial.println("Configuration write successful");
+        return true;
+    case 1:
+        Serial.println("I2C Error: Data too long");
+        break;
+    case 2:
+        Serial.println("I2C Error: NACK on address");
+        break;
+    case 3:
+        Serial.println("I2C Error: NACK on data");
+        break;
+    case 4:
+        Serial.println("I2C Error: Other error");
+        break;
+    case 5:
+        Serial.println("I2C Error: Timeout");
+        break;
+    default:
+        Serial.printf("I2C Error: Unknown (%d)\n", result);
+        break;
     }
 
-    Serial.println("Configuration write successful");
-    return true;
+    return false;
 }
 
 bool ZDP323::readPeakHold(int16_t *peakHold)
@@ -268,27 +274,43 @@ void ZDP323::enableInterrupt(uint8_t pin)
     _triggerPin = pin;
     _motionDetected = false;
 
+    // First, ensure interrupts are detached
+    detachInterrupt(digitalPinToInterrupt(_triggerPin));
+
+    // Add longer delay after initialization to ensure complete stability
+    delay(100);
+
     // Try to enable trigger mode with retries
     int retries = 3;
+    bool triggerEnabled = false;
+
     while (retries-- > 0)
     {
-        if (_config.trigom != ZDP323_CONFIG_TRIGOM_ENABLED)
+        Serial.println("Attempting to enable trigger mode...");
+        if (enableTriggerMode())
         {
-            if (enableTriggerMode())
-            {
-                break;
-            }
-            delay(1);
-        }
-        else
-        {
+            triggerEnabled = true;
+            Serial.println("Trigger mode enabled successfully");
+            // Add stability delay after successful trigger mode enable
+            delay(50);
             break;
         }
+        Serial.println("Failed to enable trigger mode, retrying...");
+        // Reset trigger mode state since write failed
+        _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
+        delay(100); // Longer delay between retries
     }
 
-    if (_config.trigom == ZDP323_CONFIG_TRIGOM_ENABLED)
+    if (triggerEnabled)
     {
+        // Now safe to attach interrupt
         attachInterrupt(digitalPinToInterrupt(_triggerPin), handleInterrupt, FALLING);
+        Serial.println("Motion detection enabled");
+    }
+    else
+    {
+        Serial.println("Failed to enable motion detection - trigger mode could not be enabled");
+        _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED; // Ensure config reflects actual state
     }
 }
 
