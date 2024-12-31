@@ -1,0 +1,4 @@
+HublinkBEAM	KEYWORD1
+begin	KEYWORD2
+initSD	KEYWORD2
+logData	KEYWORD2 
