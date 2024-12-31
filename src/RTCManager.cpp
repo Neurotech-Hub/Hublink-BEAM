@@ -40,6 +40,10 @@ bool RTCManager::begin()
 
 DateTime RTCManager::now()
 {
+    if (!_isInitialized)
+    {
+        return DateTime(DEFAULT_TIMESTAMP);
+    }
     return _rtc.now();
 }
 
@@ -82,6 +86,10 @@ uint32_t RTCManager::getUnixTime()
 
 DateTime RTCManager::getFutureTime(int days, int hours, int minutes, int seconds)
 {
+    if (!_isInitialized)
+    {
+        return DateTime(DEFAULT_TIMESTAMP);
+    }
     TimeSpan span(days, hours, minutes, seconds);
     return now() + span;
 }
@@ -98,16 +106,18 @@ DateTime RTCManager::getCompensatedDateTime()
     int month, day, year, hour, minute, second;
     static const char month_names[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
 
+    // Parse date string
     sscanf(__DATE__, "%s %d %d", monthStr, &day, &year);
     month = (strstr(month_names, monthStr) - month_names) / 3 + 1;
+
+    // Parse time string
     sscanf(__TIME__, "%d:%d:%d", &hour, &minute, &second);
 
     // Create DateTime object for compilation time
     DateTime compileTime(year, month, day, hour, minute, second);
 
     // Add upload delay compensation
-    TimeSpan uploadDelay(0, 0, 0, UPLOAD_DELAY_SECONDS);
-    return compileTime + uploadDelay;
+    return compileTime + TimeSpan(0, 0, 0, UPLOAD_DELAY_SECONDS);
 }
 
 bool RTCManager::isNewCompilation()
@@ -139,7 +149,8 @@ void RTCManager::updateRTC()
 
     // Format and print the compensation information
     char timeStr[20];
-    snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d",
+    snprintf(timeStr, sizeof(timeStr), "%04d-%02d-%02d %02d:%02d:%02d",
+             compensatedTime.year(), compensatedTime.month(), compensatedTime.day(),
              compensatedTime.hour(), compensatedTime.minute(), compensatedTime.second());
     Serial.println("Adding " + String(UPLOAD_DELAY_SECONDS) + " seconds compensation");
     Serial.println("Adjusted time:   " + String(timeStr));
@@ -147,7 +158,12 @@ void RTCManager::updateRTC()
     // Update RTC with compensated time
     _rtc.adjust(compensatedTime);
 
-    Serial.print("Final RTC time: ");
-    serialPrintDateTime();
-    Serial.println("\n---------------");
+    // Verify the time was set correctly
+    DateTime currentTime = _rtc.now();
+    char currentTimeStr[20];
+    snprintf(currentTimeStr, sizeof(currentTimeStr), "%04d-%02d-%02d %02d:%02d:%02d",
+             currentTime.year(), currentTime.month(), currentTime.day(),
+             currentTime.hour(), currentTime.minute(), currentTime.second());
+    Serial.println("Final RTC time: " + String(currentTimeStr));
+    Serial.println("---------------");
 }

@@ -39,8 +39,11 @@ private:
 
     void updateRTC();
     String getCompileDateTime();
-    DateTime getCompensatedDateTime(); // New helper function
+    DateTime getCompensatedDateTime();
     static const char *_daysOfWeek[7];
+
+    // Default time constants
+    static const uint32_t DEFAULT_TIMESTAMP = SECONDS_FROM_1970_TO_2000;
 };
 
 #endif

@@ -1,56 +1,51 @@
 #include <HublinkBEAM.h>
 
 HublinkBEAM beam;
+unsigned long lastMotionCheck = 0;
+const unsigned long MOTION_CHECK_INTERVAL = 50; // Check every 50ms
 
 void setup()
 {
     Serial.begin(115200);
-    while (!Serial)
-        delay(10);
+    delay(2000); // Allow time for serial monitor to open
 
-    Serial.println("Hublink BEAM Basic Logging Example");
-
-    // Initialize the device
-    bool fullyInitialized = beam.begin();
-
-    if (!fullyInitialized)
+    Serial.println("Initializing BEAM system...");
+    if (!beam.begin())
     {
-        Serial.println("\nWARNING: Some sensors failed to initialize");
-        Serial.println("The device will continue with limited functionality");
-        Serial.println("Failed sensors will report error values in the log");
-        delay(2000); // Give time to read the warning
+        Serial.println("Failed to initialize BEAM system!");
+        while (1)
+        {
+            delay(1000);
+        }
     }
+    Serial.println("BEAM system initialized successfully!");
 }
 
 void loop()
 {
-    // Log data from all available sensors
-    if (beam.logData())
+    // Only check for motion at our defined interval
+    unsigned long currentMillis = millis();
+    if (currentMillis - lastMotionCheck >= MOTION_CHECK_INTERVAL)
     {
-        Serial.println("Data logged successfully");
-    }
-    else
-    {
-        Serial.println("Failed to log data!");
-    }
+        lastMotionCheck = currentMillis;
 
-    // Basic delay between readings
-    delay(1000);
+        static bool lastMotionState = false;
+        bool currentMotionState = beam.isMotionDetected();
 
-    /* Sleep Mode Examples:
-     *
-     * 1. Light Sleep - CPU pauses but peripherals remain powered
-     * Use this when you need quick wake-up and peripheral state preservation
-     * Example: Sleep for 5 seconds
-     * beam.light_sleep(5000);
-     *
-     * 2. Deep Sleep - Only RTC remains powered, system restarts on wake
-     * Use this for maximum power saving when long sleep periods are acceptable
-     * Example: Sleep for 1 minute
-     * beam.deep_sleep(60000);
-     *
-     * Note: After deep_sleep, the device will restart and setup() will run again
-     * You might want to check esp_reset_reason() to determine if it's a wake from
-     * deep sleep vs a power-on reset
-     */
+        // Only print when state changes
+        if (currentMotionState != lastMotionState)
+        {
+            if (currentMotionState)
+            {
+                Serial.println("Motion detected!");
+                beam.setNeoPixel(NEOPIXEL_BLUE);
+            }
+            else
+            {
+                Serial.println("No motion");
+                beam.disableNeoPixel();
+            }
+            lastMotionState = currentMotionState;
+        }
+    }
 }

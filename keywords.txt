@@ -1,4 +1,49 @@
+# Classes
 HublinkBEAM	KEYWORD1
+ZDP323	KEYWORD1
+RTCManager	KEYWORD1
+
+# Core Methods
 begin	KEYWORD2
 initSD	KEYWORD2
-logData	KEYWORD2 
+logData	KEYWORD2
+
+# Power Management
+light_sleep	KEYWORD2
+deep_sleep	KEYWORD2
+
+# Battery Monitoring
+getBatteryVoltage	KEYWORD2
+getBatteryPercent	KEYWORD2
+isBatteryConnected	KEYWORD2
+
+# Environmental Monitoring
+getTemperature	KEYWORD2
+getPressure	KEYWORD2
+getHumidity	KEYWORD2
+getAltitude	KEYWORD2
+isEnvironmentalSensorConnected	KEYWORD2
+
+# Light Sensor
+getLux	KEYWORD2
+getRawALS	KEYWORD2
+getRawWhite	KEYWORD2
+isLightSensorConnected	KEYWORD2
+setLightGain	KEYWORD2
+setLightIntegrationTime	KEYWORD2
+
+# RTC Functions
+getDateTime	KEYWORD2
+getRTCTemperature	KEYWORD2
+getDayOfWeek	KEYWORD2
+getUnixTime	KEYWORD2
+adjustRTC	KEYWORD2
+getFutureTime	KEYWORD2
+isRTCConnected	KEYWORD2
+
+# Constants
+PIN_SD_CS	LITERAL1
+PIN_SD_DET	LITERAL1
+PIN_GREEN_LED	LITERAL1
+SEALEVELPRESSURE_HPA	LITERAL1
+CSV_HEADER	LITERAL1 

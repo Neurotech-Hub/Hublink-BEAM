@@ -1,6 +1,6 @@
 #include "HublinkBEAM.h"
 
-HublinkBEAM::HublinkBEAM(uint8_t pirEnablePin) : _pirSensor(pirEnablePin)
+HublinkBEAM::HublinkBEAM() : _pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800)
 {
     _isSDInitialized = false;
     _isPIRInitialized = false;
@@ -20,6 +20,27 @@ void HublinkBEAM::initPins()
     // Initialize on-board LED
     pinMode(PIN_GREEN_LED, OUTPUT);
     digitalWrite(PIN_GREEN_LED, LOW); // Turn off green LED
+
+    // Initialize NeoPixel power pin and pixel
+    pinMode(NEOPIXEL_POWER, OUTPUT);
+    digitalWrite(NEOPIXEL_POWER, HIGH);
+    _pixel.begin();
+    _pixel.setBrightness(20); // Set to low brightness
+    _pixel.show();            // Initialize all pixels to 'off'
+}
+
+void HublinkBEAM::setNeoPixel(uint32_t color)
+{
+    digitalWrite(NEOPIXEL_POWER, HIGH);
+    _pixel.setPixelColor(0, color);
+    _pixel.show();
+}
+
+void HublinkBEAM::disableNeoPixel()
+{
+    _pixel.setPixelColor(0, NEOPIXEL_OFF);
+    _pixel.show();
+    digitalWrite(NEOPIXEL_POWER, LOW);
 }
 
 bool HublinkBEAM::begin()
@@ -28,8 +49,9 @@ bool HublinkBEAM::begin()
     Serial.println("\nInitializing Hublink BEAM...");
     Serial.println("---------------------------");
 
-    // Initialize pins
+    // Initialize pins and set NeoPixel to blue during initialization
     initPins();
+    setNeoPixel(NEOPIXEL_BLUE);
     Serial.println("Pins initialized");
 
     // Initialize I2C for sensors
@@ -51,15 +73,19 @@ bool HublinkBEAM::begin()
 
     // Initialize battery monitor
     Serial.print("Initializing battery monitor... ");
-    if (!_batteryMonitor.begin())
+    if (!_batteryMonitor.begin(&Wire))
     {
         Serial.println("FAILED");
+        Serial.println("Could not find a valid MAX17048 sensor");
         allInitialized = false;
     }
     else
     {
         _isBatteryMonitorInitialized = true;
         Serial.println("OK");
+        Serial.printf("Battery: %.2fV (%.1f%%)\n",
+                      _batteryMonitor.cellVoltage(),
+                      _batteryMonitor.cellPercent());
     }
 
     // Initialize environmental sensor
@@ -123,6 +149,16 @@ bool HublinkBEAM::begin()
     Serial.printf("SD Card: %s\n", _isSDInitialized ? "OK" : "FAILED");
     Serial.println("----------------------");
 
+    // Set final NeoPixel state based on initialization result
+    if (allInitialized)
+    {
+        disableNeoPixel(); // Turn off if everything is OK
+    }
+    else
+    {
+        setNeoPixel(NEOPIXEL_RED); // Red if there were any failures
+    }
+
     return allInitialized;
 }
 
@@ -181,42 +217,55 @@ bool HublinkBEAM::createFile(String filename)
     return false;
 }
 
-bool HublinkBEAM::logData()
+bool HublinkBEAM::logData(const char *filename)
 {
+    // Set NeoPixel to blue to indicate logging activity
+    setNeoPixel(NEOPIXEL_BLUE);
+
     // Check for required sensors and SD card
     if (!_isSDInitialized || !isSDCardPresent())
     {
         Serial.println("Cannot log: SD card not initialized or not present");
+        if (!_isSDInitialized)
+            setNeoPixel(NEOPIXEL_RED); // Keep red if initialization failed
+        else
+            disableNeoPixel(); // Turn off if everything was initialized OK
         return false;
     }
 
     if (!_isRTCInitialized)
     {
         Serial.println("Cannot log: RTC not initialized");
+        if (!_isRTCInitialized)
+            setNeoPixel(NEOPIXEL_RED); // Keep red if initialization failed
+        else
+            disableNeoPixel(); // Turn off if everything was initialized OK
         return false;
     }
 
-    String filename = getCurrentFilename();
+    String currentFile = filename ? String(filename) : getCurrentFilename();
 
     // Check if file exists, create it with header if it doesn't
-    if (!SD.exists(filename))
+    if (!SD.exists(currentFile))
     {
-        if (!createFile(filename))
+        if (!createFile(currentFile))
         {
+            setNeoPixel(NEOPIXEL_RED); // Show error state
             return false;
         }
     }
 
     // Open file in append mode
-    File dataFile = SD.open(filename, FILE_APPEND);
+    File dataFile = SD.open(currentFile, FILE_APPEND);
     if (!dataFile)
     {
-        Serial.println("Failed to open file for logging: " + filename);
+        Serial.println("Failed to open file for logging: " + currentFile);
+        setNeoPixel(NEOPIXEL_RED); // Show error state
         return false;
     }
 
-    // Get PIR count and reset it (will be 0 if read fails or sensor not initialized)
-    uint32_t pirCount = _isPIRInitialized ? _pirSensor.readAndResetCounter() : 0;
+    // Get motion state (1 if motion detected, 0 if not)
+    uint32_t motionState = _isPIRInitialized ? (isMotionDetected() ? 1 : 0) : 0;
 
     // Format data row with error values for uninitialized sensors
     DateTime now = getDateTime();
@@ -231,18 +280,25 @@ bool HublinkBEAM::logData()
              _isEnvSensorInitialized ? getPressure() : -1.0f,
              _isEnvSensorInitialized ? getHumidity() : -1.0f,
              _isLightSensorInitialized ? getLux() : -1.0f,
-             pirCount);
+             motionState);
 
     // Write data
-    if (dataFile.println(dataString))
+    Serial.println("Writing data to file: " + currentFile);
+    Serial.println(dataString);
+    bool success = dataFile.println(dataString);
+    dataFile.close();
+
+    if (success)
     {
-        dataFile.close();
-        return true;
+        disableNeoPixel(); // Turn off if everything was OK
+    }
+    else
+    {
+        Serial.println("Failed to write to file: " + currentFile);
+        setNeoPixel(NEOPIXEL_RED); // Show error state
     }
 
-    Serial.println("Failed to write to file: " + filename);
-    dataFile.close();
-    return false;
+    return success;
 }
 
 float HublinkBEAM::getBatteryVoltage()
@@ -367,7 +423,7 @@ DateTime HublinkBEAM::getDateTime()
 {
     if (!_isRTCInitialized)
     {
-        return DateTime(0);
+        return DateTime(SECONDS_FROM_1970_TO_2000); // Use RTClib's default epoch
     }
     return _rtc.now();
 }
@@ -419,7 +475,7 @@ DateTime HublinkBEAM::getFutureTime(int days, int hours, int minutes, int second
 {
     if (!_isRTCInitialized)
     {
-        return DateTime(0);
+        return DateTime(SECONDS_FROM_1970_TO_2000); // Use RTClib's default epoch
     }
     return _rtc.getFutureTime(days, hours, minutes, seconds);
 }
@@ -440,4 +496,14 @@ void HublinkBEAM::deep_sleep(uint32_t milliseconds)
     esp_sleep_enable_timer_wakeup(milliseconds * 1000); // Convert to microseconds
     esp_deep_sleep_start();
     // Note: Device will restart after deep sleep
+}
+
+bool HublinkBEAM::isMotionDetected()
+{
+    if (!_isPIRInitialized)
+    {
+        Serial.println("PIR sensor not initialized");
+        return false;
+    }
+    return _pirSensor.isMotionDetected();
 }

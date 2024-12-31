@@ -4,17 +4,26 @@
 #include <Arduino.h>
 #include <SD.h>
 #include <Wire.h>
-#include "src/ZDP323.h"
+#include "ZDP323.h"
 #include "Adafruit_MAX1704X.h"
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include "Adafruit_VEML7700.h"
-#include "src/RTCManager.h"
+#include "RTCManager.h"
+#include <Adafruit_NeoPixel.h>
 
 // Pin Definitions
-#define PIN_SD_CS 12    // SD card chip select
-#define PIN_SD_DET 11   // SD card detection pin
-#define PIN_GREEN_LED 5 // On-board green LED
+#define PIN_SD_CS 12     // SD card chip select
+#define PIN_SD_DET 11    // SD card detection pin
+#define PIN_GREEN_LED 5  // On-board green LED
+#define PIN_NEOPIXEL 6   // NeoPixel LED pin
+#define NEOPIXEL_POWER 7 // NeoPixel power control pin
+
+// NeoPixel Colors
+#define NEOPIXEL_OFF 0x000000
+#define NEOPIXEL_RED 0xFF0000
+#define NEOPIXEL_GREEN 0x00FF00
+#define NEOPIXEL_BLUE 0x0000FF
 
 // Environmental constants
 #define SEALEVELPRESSURE_HPA (1013.25)
@@ -25,10 +34,15 @@
 class HublinkBEAM
 {
 public:
-    HublinkBEAM(uint8_t pirEnablePin = -1);
+    HublinkBEAM();
     bool begin();
     bool initSD();
-    bool logData();
+    bool logData(const char *filename = nullptr);
+    bool isMotionDetected(); // Check for motion using PIR sensor
+
+    // NeoPixel control functions
+    void setNeoPixel(uint32_t color);
+    void disableNeoPixel();
 
     // Power management functions
     void light_sleep(uint32_t milliseconds); // Light sleep mode
@@ -84,6 +98,7 @@ private:
     bool _isLightSensorInitialized;
     RTCManager _rtc;
     bool _isRTCInitialized;
+    Adafruit_NeoPixel _pixel;
 };
 
 #endif

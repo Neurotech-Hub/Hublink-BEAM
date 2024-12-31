@@ -1,7 +1,14 @@
 #include "ZDP323.h"
 
-ZDP323::ZDP323(uint8_t enablePin, uint16_t i2cAddress)
-    : _enablePin(enablePin), _i2cAddress(i2cAddress), _initialized(false)
+volatile bool ZDP323::_motionDetected = false;
+
+void IRAM_ATTR ZDP323::handleInterrupt()
+{
+    _motionDetected = true;
+}
+
+ZDP323::ZDP323(uint8_t i2cAddress)
+    : _i2cAddress(i2cAddress), _initialized(false)
 {
     _config.detlvl = ZDP323_CONFIG_DETLVL_DEFAULT;
     _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
@@ -12,95 +19,169 @@ ZDP323::ZDP323(uint8_t enablePin, uint16_t i2cAddress)
 bool ZDP323::begin(TwoWire &wirePort)
 {
     _wire = &wirePort;
+    _wire->setTimeout(3000); // Set timeout to 3ms
 
-    if (_enablePin != -1)
+    // Setup trigger pin with interrupt
+    pinMode(ZDP323_TRIGGER_PIN, INPUT_PULLUP);
+
+    // Step 1: Wait for power-on stabilization
+    delay(500);
+
+    Serial.println("Initializing PIR sensor...");
+
+    // Step 2: Initial configuration with maximum threshold
+    _config.detlvl = 0xFF; // Maximum threshold for initial setup
+    _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
+    _config.fstep = ZDP323_CONFIG_FSTEP_2;        // Default filter step
+    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_B; // Default filter type
+
+    // Step 3 & 4: Write config and check Peak Hold until stable
+    bool stable = false;
+    const int maxAttempts = 10;
+    int attempts = 0;
+
+    while (!stable && attempts < maxAttempts)
     {
-        pinMode(_enablePin, OUTPUT);
-        enable();
-        delay(1000); // Allow sensor to stabilize
+        Serial.printf("Configuration attempt %d of %d\n", attempts + 1, maxAttempts);
+
+        if (!writeConfig())
+        {
+            Serial.println("Failed to write configuration");
+            return false;
+        }
+
+        // Read Peak Hold value
+        int16_t peakHold;
+        if (!readPeakHold(&peakHold))
+        {
+            Serial.println("Failed to read peak hold value");
+            return false;
+        }
+
+        // Check if below half threshold
+        int16_t halfThreshold = (0xFF * 8) / 2;
+        Serial.printf("Peak Hold: %d, Half Threshold: %d\n", peakHold, halfThreshold);
+
+        if (abs(peakHold) < halfThreshold)
+        {
+            stable = true;
+        }
+        else
+        {
+            delay(ZDP323_TCYC_MS);
+            attempts++;
+        }
     }
 
-    // Initialize I2C
-    _wire->begin();
-    _wire->beginTransmission(_i2cAddress);
-    if (_wire->endTransmission() != 0)
+    if (!stable)
     {
-        Serial.printf("Failed to communicate with PIR sensor at address 0x%03X\n", _i2cAddress);
+        Serial.println("Failed to achieve stable reading");
         return false;
     }
 
-    // Write default configuration
+    // Step 5: Write final configuration with desired threshold and enable trigger mode
+    _config.detlvl = ZDP323_CONFIG_DETLVL_DEFAULT;
+    _config.trigom = ZDP323_CONFIG_TRIGOM_ENABLED;
+    Serial.println("Writing final configuration with trigger mode enabled...");
     if (!writeConfig())
     {
-        Serial.println("Failed to write default configuration to PIR sensor");
+        Serial.println("Failed to write final configuration");
         return false;
     }
 
-    delay(2000); // Wait for configuration to take effect
+    // Step 6: Wait for sensor stability
+    Serial.println("Waiting for sensor stability...");
+    delay(ZDP323_TSTAB_MS);
 
-    // Dummy read to clear the peak hold register
-    int16_t dummy;
-    if (!readPeakHold(&dummy))
-    {
-        Serial.println("Failed to perform initial peak hold read");
-        return false;
-    }
-
+    // Step 7: Setup interrupt for motion detection
     _initialized = true;
-    Serial.printf("Successfully initialized PIR sensor at address 0x%03X\n", _i2cAddress);
+    _motionDetected = false;
+    attachInterrupt(digitalPinToInterrupt(ZDP323_TRIGGER_PIN), handleInterrupt, FALLING);
+
+    Serial.println("Successfully initialized PIR sensor");
     return true;
 }
 
 bool ZDP323::writeConfig()
 {
-    uint8_t data[7] = {0};
+    // Configuration is 56 bits (7 bytes) sent MSB first
+    uint8_t data[7] = {0}; // All reserved bits default to 0
 
-    // Format configuration data according to sensor protocol
+    // Byte 3: FILSEL (bits 26-28), FSTEP (bits 24-25), TRIGOM (bit 23)
     data[3] = ((_config.filsel & ZDP323_CONFIG_FILSEL_MASK) << 2) |
               (_config.fstep & ZDP323_CONFIG_FSTEP_MASK);
-    data[4] = ((_config.trigom & ZDP323_CONFIG_TRIGOM_MASK) << 7) |
-              ((_config.detlvl >> 1) & ZDP323_CONFIG_DETLVL_MASK_MSB);
-    data[5] = ((_config.detlvl & ZDP323_CONFIG_DETLVL_MASK_LSB) << 7);
 
+    // Byte 4: TRIGOM (bit 23) and upper bits of DETLVL (bits 22-16)
+    data[4] = ((_config.trigom & ZDP323_CONFIG_TRIGOM_MASK) << 7) |
+              ((_config.detlvl >> 1) & 0x7F);
+
+    // Byte 5: Lower bit of DETLVL (bit 15) and reserved bits
+    data[5] = (_config.detlvl & 0x01) << 7;
+
+    Serial.println("Writing configuration data (56 bits):");
+    Serial.printf("FILSEL = %d, FSTEP = %d, TRIGOM = %d, DETLVL = %d\n",
+                  _config.filsel, _config.fstep, _config.trigom, _config.detlvl);
+
+    for (int i = 0; i < 7; i++)
+    {
+        Serial.printf("Byte %d = 0x%02X\n", i, data[i]);
+    }
+
+    // Write configuration using General Call address
     _wire->beginTransmission(_i2cAddress);
     _wire->write(data, 7);
-    return (_wire->endTransmission() == 0);
+    uint8_t result = _wire->endTransmission(true);
+
+    if (result != 0)
+    {
+        Serial.printf("Configuration write failed with error code: %d\n", result);
+        return false;
+    }
+
+    Serial.println("Configuration write successful");
+    return true;
 }
 
 bool ZDP323::readPeakHold(int16_t *peakHold)
 {
     if (!peakHold)
-        return false;
-
-    if (_wire->requestFrom(_i2cAddress, (uint8_t)2) != 2)
     {
+        Serial.println("Read peak hold failed: null pointer");
         return false;
     }
 
-    uint8_t msb = _wire->read();
-    uint8_t lsb = _wire->read();
+    // Request two bytes from the device
+    uint8_t bytesRead = _wire->requestFrom(_i2cAddress, (uint8_t)2);
+    if (bytesRead != 2)
+    {
+        Serial.printf("Failed to read peak hold data, requested 2 bytes but got %d\n", bytesRead);
+        return false;
+    }
 
+    // Read the two bytes
+    uint8_t msb = _wire->read(); // Upper byte (including 4 bits of peak hold)
+    uint8_t lsb = _wire->read(); // Lower byte
+
+    // Peak hold is a 12-bit signed value
     *peakHold = ((int16_t)(msb & 0x0F) << 8) | lsb;
-    *peakHold <<= 4;
+    *peakHold <<= 4; // Sign extend
     *peakHold >>= 4;
 
+    Serial.printf("Peak hold value: %d (MSB: 0x%02X, LSB: 0x%02X)\n", *peakHold, msb, lsb);
     return true;
 }
 
-void ZDP323::enable()
+bool ZDP323::isMotionDetected()
 {
-    if (_enablePin != -1)
+    if (!_initialized)
     {
-        digitalWrite(_enablePin, HIGH);
+        return false;
     }
-}
 
-void ZDP323::disable()
-{
-    if (_enablePin != -1)
-    {
-        digitalWrite(_enablePin, LOW);
-    }
+    // Read and clear the motion flag
+    bool motion = _motionDetected;
+    _motionDetected = false;
+    return motion;
 }
 
 void ZDP323::setDetectionLevel(uint8_t level)
@@ -108,76 +189,28 @@ void ZDP323::setDetectionLevel(uint8_t level)
     _config.detlvl = level;
 }
 
-void ZDP323::setTriggerOut(bool enabled)
-{
-    _config.trigom = enabled ? ZDP323_CONFIG_TRIGOM_ENABLED : ZDP323_CONFIG_TRIGOM_DISABLED;
-}
-
 void ZDP323::setFilterStep(uint8_t step)
 {
-    _config.fstep = step & ZDP323_CONFIG_FSTEP_MASK;
+    if (_config.fstep != (step & ZDP323_CONFIG_FSTEP_MASK))
+    {
+        _config.fstep = step & ZDP323_CONFIG_FSTEP_MASK;
+        if (writeConfig())
+        {
+            Serial.println("Filter step updated, waiting for stability...");
+            delay(ZDP323_TSTAB_MS);
+        }
+    }
 }
 
 void ZDP323::setFilterType(uint8_t type)
 {
-    _config.filsel = type & ZDP323_CONFIG_FILSEL_MASK;
-}
-
-bool ZDP323::readCounter(uint32_t *count)
-{
-    if (!_initialized || !count)
+    if (_config.filsel != (type & ZDP323_CONFIG_FILSEL_MASK))
     {
-        return false;
+        _config.filsel = type & ZDP323_CONFIG_FILSEL_MASK;
+        if (writeConfig())
+        {
+            Serial.println("Filter type updated, waiting for stability...");
+            delay(ZDP323_TSTAB_MS);
+        }
     }
-
-    _wire->beginTransmission(_i2cAddress);
-    _wire->write(ZDP323_REG_COUNTER);
-    if (_wire->endTransmission() != 0)
-    {
-        return false;
-    }
-
-    // Request 4 bytes (32-bit counter)
-    if (_wire->requestFrom(_i2cAddress, (uint8_t)4) != 4)
-    {
-        return false;
-    }
-
-    // Read counter value (MSB first)
-    *count = 0;
-    for (int i = 0; i < 4; i++)
-    {
-        *count = (*count << 8) | _wire->read();
-    }
-
-    return true;
-}
-
-bool ZDP323::resetCounter()
-{
-    if (!_initialized)
-    {
-        return false;
-    }
-
-    _wire->beginTransmission(_i2cAddress);
-    _wire->write(ZDP323_REG_COUNTER_RESET);
-    _wire->write(0x00); // Any value will trigger the reset
-    return (_wire->endTransmission() == 0);
-}
-
-uint32_t ZDP323::readAndResetCounter()
-{
-    uint32_t count = 0;
-
-    // Try to read the counter
-    if (!readCounter(&count))
-    {
-        count = 0; // Reset to 0 if read fails
-    }
-
-    // Always try to reset the counter, regardless of read success
-    resetCounter();
-
-    return count;
 }
