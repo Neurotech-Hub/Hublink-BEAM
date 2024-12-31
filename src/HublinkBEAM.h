@@ -13,11 +13,12 @@
 #include <Adafruit_NeoPixel.h>
 
 // Pin Definitions
-#define PIN_SD_CS 12     // SD card chip select
-#define PIN_SD_DET 11    // SD card detection pin
-#define PIN_GREEN_LED 5  // On-board green LED
-#define PIN_NEOPIXEL 6   // NeoPixel LED pin
-#define NEOPIXEL_POWER 7 // NeoPixel power control pin
+#define PIN_SD_CS 12       // SD card chip select
+#define PIN_SD_DET 11      // SD card detection pin
+#define PIN_GREEN_LED 5    // On-board green LED
+#define PIN_NEOPIXEL 6     // NeoPixel LED pin
+#define NEOPIXEL_POWER 7   // NeoPixel power control pin
+#define PIN_PIR_TRIGGER A4 // PIR trigger pin (shared with I2C SDA)
 
 // NeoPixel Colors
 #define NEOPIXEL_OFF 0x000000
@@ -38,7 +39,9 @@ public:
     bool begin();
     bool initSD();
     bool logData(const char *filename = nullptr);
-    bool isMotionDetected(); // Check for motion using PIR sensor
+    bool isMotionDetected();       // Check for motion using PIR sensor
+    void enableMotionDetection();  // Enable PIR interrupt
+    void disableMotionDetection(); // Disable PIR interrupt
 
     // NeoPixel control functions
     void setNeoPixel(uint32_t color);

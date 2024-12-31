@@ -4,18 +4,18 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+// Pin Definitions
+#define ZDP323_TRIGGER_PIN A4 // Default trigger pin
+
 // Device addresses
 #define ZDP323_I2C_GENERAL_CALL 0x00 // General Call address for single-sensor setup
 #define ZDP323_I2C_ADDRESS ZDP323_I2C_GENERAL_CALL
-
-// Pin definitions
-#define ZDP323_TRIGGER_PIN A4 // Analog pin A4 (GPIO 5) on ESP32-S3
 
 // Register addresses
 #define ZDP323_REG_PEAK_HOLD 0x0A // Peak Hold register address
 
 // Configuration defaults from documentation
-#define ZDP323_CONFIG_DETLVL_DEFAULT 0x1C  // B22-B15: 00011100 (default threshold)
+#define ZDP323_CONFIG_DETLVL_DEFAULT 0x40  // B22-B15: 01000000 (threshold = ±512 ADC)
 #define ZDP323_CONFIG_TRIGOM_DISABLED 0x00 // B23: 0 (disabled)
 #define ZDP323_CONFIG_TRIGOM_ENABLED 0x01  // B23: 1 (enabled)
 #define ZDP323_CONFIG_TRIGOM_MASK 0x01
@@ -44,12 +44,16 @@ public:
     ZDP323(uint8_t i2cAddress = ZDP323_I2C_ADDRESS);
     bool begin(TwoWire &wirePort = Wire);
     bool writeConfig();
-    bool isMotionDetected(); // Returns and clears the motion flag
+    bool isMotionDetected();            // Returns and clears the motion flag
+    void enableInterrupt(uint8_t pin);  // Enable interrupt on specified pin
+    void disableInterrupt(uint8_t pin); // Disable interrupt on specified pin
 
     // Configuration methods
     void setDetectionLevel(uint8_t level);
     void setFilterStep(uint8_t step);
     void setFilterType(uint8_t type);
+    bool enableTriggerMode();  // Enable trigger output mode
+    bool disableTriggerMode(); // Disable trigger output mode
 
 private:
     static void IRAM_ATTR handleInterrupt();
@@ -68,6 +72,7 @@ private:
     uint8_t _i2cAddress;
     bool _initialized;
     unsigned long _lastPeakHoldRead;
+    uint8_t _triggerPin; // Store the trigger pin
 };
 
 #endif

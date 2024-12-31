@@ -12,6 +12,8 @@ HublinkBEAM::HublinkBEAM() : _pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800)
 
 void HublinkBEAM::initPins()
 {
+    // Set PIR trigger pin mode early
+    pinMode(PIN_PIR_TRIGGER, INPUT);
     // Initialize SD card pins
     pinMode(PIN_SD_CS, OUTPUT);
     digitalWrite(PIN_SD_CS, HIGH); // Deselect SD card by default
@@ -153,6 +155,8 @@ bool HublinkBEAM::begin()
     if (allInitialized)
     {
         disableNeoPixel(); // Turn off if everything is OK
+        // Enable motion detection only after all I2C communication is done
+        enableMotionDetection();
     }
     else
     {
@@ -189,14 +193,20 @@ bool HublinkBEAM::isSDCardPresent()
 String HublinkBEAM::getCurrentFilename()
 {
     DateTime now = getDateTime();
-    char filename[13];
-    snprintf(filename, sizeof(filename), "%04d%02d%02d.csv",
+    char filename[14];
+    snprintf(filename, sizeof(filename), "/%04d%02d%02d.csv",
              now.year(), now.month(), now.day());
     return String(filename);
 }
 
 bool HublinkBEAM::createFile(String filename)
 {
+    // Ensure filename starts with a forward slash
+    if (!filename.startsWith("/"))
+    {
+        filename = "/" + filename;
+    }
+
     File file = SD.open(filename, FILE_WRITE);
     if (!file)
     {
@@ -227,9 +237,9 @@ bool HublinkBEAM::logData(const char *filename)
     {
         Serial.println("Cannot log: SD card not initialized or not present");
         if (!_isSDInitialized)
-            setNeoPixel(NEOPIXEL_RED); // Keep red if initialization failed
+            setNeoPixel(NEOPIXEL_RED);
         else
-            disableNeoPixel(); // Turn off if everything was initialized OK
+            disableNeoPixel();
         return false;
     }
 
@@ -237,20 +247,26 @@ bool HublinkBEAM::logData(const char *filename)
     {
         Serial.println("Cannot log: RTC not initialized");
         if (!_isRTCInitialized)
-            setNeoPixel(NEOPIXEL_RED); // Keep red if initialization failed
+            setNeoPixel(NEOPIXEL_RED);
         else
-            disableNeoPixel(); // Turn off if everything was initialized OK
+            disableNeoPixel();
         return false;
     }
 
     String currentFile = filename ? String(filename) : getCurrentFilename();
+
+    // Ensure filename starts with a forward slash
+    if (!currentFile.startsWith("/"))
+    {
+        currentFile = "/" + currentFile;
+    }
 
     // Check if file exists, create it with header if it doesn't
     if (!SD.exists(currentFile))
     {
         if (!createFile(currentFile))
         {
-            setNeoPixel(NEOPIXEL_RED); // Show error state
+            setNeoPixel(NEOPIXEL_RED);
             return false;
         }
     }
@@ -260,7 +276,7 @@ bool HublinkBEAM::logData(const char *filename)
     if (!dataFile)
     {
         Serial.println("Failed to open file for logging: " + currentFile);
-        setNeoPixel(NEOPIXEL_RED); // Show error state
+        setNeoPixel(NEOPIXEL_RED);
         return false;
     }
 
@@ -506,4 +522,20 @@ bool HublinkBEAM::isMotionDetected()
         return false;
     }
     return _pirSensor.isMotionDetected();
+}
+
+void HublinkBEAM::enableMotionDetection()
+{
+    if (_isPIRInitialized)
+    {
+        _pirSensor.enableInterrupt(PIN_PIR_TRIGGER);
+    }
+}
+
+void HublinkBEAM::disableMotionDetection()
+{
+    if (_isPIRInitialized)
+    {
+        _pirSensor.disableInterrupt(PIN_PIR_TRIGGER);
+    }
 }

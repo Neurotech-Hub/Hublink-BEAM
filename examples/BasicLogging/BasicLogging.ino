@@ -1,8 +1,8 @@
 #include <HublinkBEAM.h>
 
 HublinkBEAM beam;
-unsigned long lastMotionCheck = 0;
-const unsigned long MOTION_CHECK_INTERVAL = 50; // Check every 50ms
+unsigned long lastLogTime = 0;
+const unsigned long LOG_INTERVAL = 60000; // Log every minute
 
 void setup()
 {
@@ -23,29 +23,38 @@ void setup()
 
 void loop()
 {
-    // Only check for motion at our defined interval
-    unsigned long currentMillis = millis();
-    if (currentMillis - lastMotionCheck >= MOTION_CHECK_INTERVAL)
+    // Check for motion (interrupt automatically disabled when detected)
+    if (beam.isMotionDetected())
     {
-        lastMotionCheck = currentMillis;
+        Serial.println("Motion detected!");
+        beam.setNeoPixel(NEOPIXEL_BLUE);
 
-        static bool lastMotionState = false;
-        bool currentMotionState = beam.isMotionDetected();
+        delay(100); // Small delay to avoid rapid toggling
+        beam.disableNeoPixel();
 
-        // Only print when state changes
-        if (currentMotionState != lastMotionState)
-        {
-            if (currentMotionState)
-            {
-                Serial.println("Motion detected!");
-                beam.setNeoPixel(NEOPIXEL_BLUE);
-            }
-            else
-            {
-                Serial.println("No motion");
-                beam.disableNeoPixel();
-            }
-            lastMotionState = currentMotionState;
-        }
+        // Re-enable motion detection after handling the event
+        beam.enableMotionDetection();
     }
+
+    // Regular interval logging
+    // unsigned long currentMillis = millis();
+    // if (currentMillis - lastLogTime >= LOG_INTERVAL)
+    // {
+    //     lastLogTime = currentMillis;
+
+    //     // Temporarily disable motion detection during logging
+    //     beam.disableMotionDetection();
+
+    //     if (beam.logData())
+    //     {
+    //         Serial.println("Regular log completed successfully");
+    //     }
+    //     else
+    //     {
+    //         Serial.println("Failed to complete regular log");
+    //     }
+
+    //     // Re-enable motion detection after logging
+    //     beam.enableMotionDetection();
+    // }
 }
