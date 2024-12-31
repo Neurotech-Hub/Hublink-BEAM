@@ -6,9 +6,13 @@ volatile uint8_t ZDP323::_triggerPin = 0;
 
 void IRAM_ATTR ZDP323::handleInterrupt()
 {
+    // Set motion flag and disable further interrupts
     _motionDetected = true;
     detachInterrupt(digitalPinToInterrupt(_triggerPin));
+
+    // Visual indication (if LED is available)
     digitalWrite(LED_BUILTIN, HIGH);
+
     // Ensure trigger pulse completes (50µs + margin)
     delayMicroseconds(100);
 }

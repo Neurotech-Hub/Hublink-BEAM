@@ -494,13 +494,38 @@ void HublinkBEAM::light_sleep(uint32_t milliseconds)
 {
     if (_isPIRInitialized)
     {
-        gpio_set_direction((gpio_num_t)3, GPIO_MODE_INPUT); // SDA is GPIO3
-        gpio_wakeup_enable((gpio_num_t)3, GPIO_INTR_LOW_LEVEL);
+        gpio_set_direction((gpio_num_t)PIN_PIR_TRIGGER, GPIO_MODE_INPUT);
+        gpio_wakeup_enable((gpio_num_t)PIN_PIR_TRIGGER, GPIO_INTR_LOW_LEVEL);
         esp_sleep_enable_gpio_wakeup();
     }
 
+    uint32_t start = millis();
     esp_sleep_enable_timer_wakeup(milliseconds * 1000); // Convert to microseconds
-    esp_light_sleep_start();
+
+    while ((millis() - start) < milliseconds)
+    {
+        esp_light_sleep_start();
+
+        // If we woke up early due to motion
+        if (_isPIRInitialized && _pirSensor.isMotionDetected())
+        {
+            // Motion has been detected and interrupt already disabled by ZDP323
+            // Calculate remaining sleep time
+            uint32_t elapsed = millis() - start;
+            if (elapsed < milliseconds)
+            {
+                uint32_t remaining = milliseconds - elapsed;
+                // Reset wakeup timer for remaining duration
+                esp_sleep_enable_timer_wakeup(remaining * 1000);
+            }
+        }
+    }
+
+    // Re-enable motion detection if it was disabled
+    if (_isPIRInitialized)
+    {
+        enableMotionDetection();
+    }
 }
 
 void HublinkBEAM::deep_sleep(uint32_t milliseconds)
