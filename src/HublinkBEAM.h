@@ -10,19 +10,22 @@
 #include <Adafruit_BME280.h>
 #include "Adafruit_VEML7700.h"
 #include "RTCManager.h"
+#include "ULPManager.h"
 #include <Adafruit_NeoPixel.h>
+#include "esp_sleep.h"
 
 // Pin Definitions
-#define PIN_SD_CS 12        // SD card chip select
-#define PIN_SD_DET 11       // SD card detection pin
-#define PIN_GREEN_LED 5     // On-board green LED
-#define PIN_PIR_TRIGGER SDA // PIR trigger pin (shared with I2C SDA)
+#define PIN_SD_CS 12      // SD card chip select
+#define PIN_SD_DET 11     // SD card detection pin
+#define PIN_GREEN_LED 5   // On-board green LED
+#define PIN_PIR_TRIGGER 3 // PIR trigger pin (GPIO3)
 
 // NeoPixel Colors
 #define NEOPIXEL_OFF 0x000000
 #define NEOPIXEL_RED 0xFF0000
 #define NEOPIXEL_GREEN 0x00FF00
 #define NEOPIXEL_BLUE 0x0000FF
+#define NEOPIXEL_PURPLE 0x800080
 
 // Environmental constants
 #define SEALEVELPRESSURE_HPA (1013.25)
@@ -37,17 +40,11 @@ public:
     bool begin();
     bool initSD();
     bool logData(const char *filename = nullptr);
-    bool isMotionDetected();       // Check for motion using PIR sensor
-    void enableMotionDetection();  // Enable PIR interrupt
-    void disableMotionDetection(); // Disable PIR interrupt
+    void sleep(uint32_t milliseconds); // Enter deep sleep for specified duration
 
     // NeoPixel control functions
     void setNeoPixel(uint32_t color);
     void disableNeoPixel();
-
-    // Power management functions
-    void light_sleep(uint32_t milliseconds); // Light sleep mode
-    void deep_sleep(uint32_t milliseconds);  // Deep sleep mode
 
     // Battery monitoring functions
     float getBatteryVoltage();
@@ -83,9 +80,11 @@ public:
 
 private:
     void initPins();
+    bool initSensors(bool isWakeFromSleep);
     String getCurrentFilename();      // Gets filename in YYYYMMDD.csv format
     bool createFile(String filename); // Creates new file with header
     bool isSDCardPresent();           // Checks if SD card is inserted
+    bool isWakeFromDeepSleep();       // Check if we're waking from deep sleep
 
     File _dataFile;
     bool _isSDInitialized;
@@ -100,6 +99,7 @@ private:
     RTCManager _rtc;
     bool _isRTCInitialized;
     Adafruit_NeoPixel _pixel;
+    ULPManager _ulp;
 };
 
 #endif

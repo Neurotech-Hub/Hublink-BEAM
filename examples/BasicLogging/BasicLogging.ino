@@ -17,14 +17,8 @@ void setup()
 
 void loop()
 {
-  // Log data (this will automatically handle motion detection state)
   beam.logData();
-
-  // Sleep until next logging interval
-  // If motion is detected during sleep:
-  // 1. Wake up to service the interrupt
-  // 2. Disable further interrupts
-  // 3. Sleep for remaining time
-  // 4. Motion detection will be re-enabled in logData()
-  beam.light_sleep(LOG_INTERVAL);
+  beam.sleep(LOG_INTERVAL);
+  // delay(1000);
+  // Note: Device will restart after deep sleep, returning to setup()
 }

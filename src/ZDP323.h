@@ -32,31 +32,25 @@
 #define ZDP323_CONFIG_FILSEL_MASK 0x07
 
 // Timing constants
-#define ZDP323_TSTAB_MS 10000 // Stability time (30 seconds)
-#define ZDP323_TCYC_MS 10     // Minimum time between peak hold reads
+#define ZDP323_TSTAB_MS 3000 // Stability time (30 seconds)
+#define ZDP323_TCYC_MS 10    // Minimum time between peak hold reads
 
 class ZDP323
 {
 public:
     ZDP323(uint8_t i2cAddress = ZDP323_I2C_ADDRESS);
-    bool begin(TwoWire &wirePort = Wire);
+    bool begin(TwoWire &wirePort = Wire, bool isWakeFromSleep = false);
     bool writeConfig();
-    bool isMotionDetected();            // Returns and clears the motion flag
-    void enableInterrupt(uint8_t pin);  // Enable interrupt on specified pin
-    void disableInterrupt(uint8_t pin); // Disable interrupt on specified pin
+    bool enableTriggerMode();
+    bool disableTriggerMode();
 
     // Configuration methods
     void setDetectionLevel(uint8_t level);
     void setFilterStep(uint8_t step);
     void setFilterType(uint8_t type);
-    bool enableTriggerMode();  // Enable trigger output mode
-    bool disableTriggerMode(); // Disable trigger output mode
 
 private:
-    static void IRAM_ATTR handleInterrupt();
-    static volatile bool _motionDetected;
-    static volatile uint8_t _triggerPin;
-    bool readPeakHold(int16_t *peakHold); // Read the peak hold value
+    bool readPeakHold(int16_t *peakHold);
 
     struct Config
     {
