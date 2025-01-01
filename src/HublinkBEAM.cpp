@@ -51,13 +51,22 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
     bool allInitialized = true;
 
     Serial.println("   a. Starting I2C...");
+    if (isWakeFromSleep)
+    {
+        Serial.println("      - Waking from sleep, stopping ULP...");
+        _ulp.stop();
+        delay(10); // Give pins time to stabilize
+    }
+
     Wire.begin();
     delay(100); // Give I2C time to stabilize
 
     // Release GPIO hold if waking from sleep
     if (isWakeFromSleep)
     {
-        _ulp.stop();
+        Wire.beginTransmission(0x00);
+        uint8_t error = Wire.endTransmission();
+        Serial.printf("      - I2C bus state: %d (0=OK)\n", error);
     }
 
     Serial.println("   b. Initializing PIR sensor...");
@@ -396,8 +405,6 @@ void HublinkBEAM::sleep(uint32_t milliseconds)
         _pirSensor.enableTriggerMode();
     }
 
-    Wire.end();
-
     Serial.println("      - Starting deep sleep...");
     Serial.flush();
 
@@ -405,6 +412,9 @@ void HublinkBEAM::sleep(uint32_t milliseconds)
 
     // Configure deep sleep wakeup sources
     esp_sleep_enable_timer_wakeup(milliseconds * 1000); // Convert to microseconds
+
+    Serial.println("      - Starting deep sleep...");
+    Serial.flush();
     esp_deep_sleep_start();
     // Note: Device will restart after deep sleep, returning to setup()
 }

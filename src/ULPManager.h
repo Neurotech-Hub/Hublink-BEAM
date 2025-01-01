@@ -14,10 +14,6 @@ static const uint32_t PROG_START = 1;  // Program start address
 #define SDA_GPIO GPIO_NUM_3 // GPIO3 for SDA
 #define SCL_GPIO GPIO_NUM_4 // GPIO4 for SCL
 
-// Convert GPIO numbers to RTC GPIO numbers for ESP32-S3
-#define RTC_GPIO_NUM_3 3 // RTC GPIO number for GPIO3
-#define RTC_GPIO_NUM_4 4 // RTC GPIO number for GPIO4
-
 class ULPManager
 {
 public:

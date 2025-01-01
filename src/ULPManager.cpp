@@ -45,19 +45,12 @@ void ULPManager::start()
     rtc_gpio_set_level((gpio_num_t)PIN_I2C_POWER, 1);
     rtc_gpio_hold_en((gpio_num_t)PIN_I2C_POWER);
 
-    // Configure SDA (GPIO3)
+    // Only configure SDA (GPIO3) for ULP reading
     rtc_gpio_init(SDA_GPIO);
     rtc_gpio_set_direction(SDA_GPIO, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_en(SDA_GPIO);
+    rtc_gpio_pullup_dis(SDA_GPIO); // Use hardware pullup
     rtc_gpio_pulldown_dis(SDA_GPIO);
     rtc_gpio_hold_en(SDA_GPIO);
-
-    // Configure SCL (GPIO4)
-    rtc_gpio_init(SCL_GPIO);
-    rtc_gpio_set_direction(SCL_GPIO, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_en(SCL_GPIO);
-    rtc_gpio_pulldown_dis(SCL_GPIO);
-    rtc_gpio_hold_en(SCL_GPIO);
 
     // Load ULP program
     Serial.println("      - Loading ULP program...");
@@ -85,9 +78,16 @@ void ULPManager::start()
 
 void ULPManager::stop()
 {
+    // First disable holds
     rtc_gpio_hold_dis((gpio_num_t)PIN_I2C_POWER);
     rtc_gpio_hold_dis(SDA_GPIO);
-    rtc_gpio_hold_dis(SCL_GPIO);
+
+    // Reset SDA pin configuration
+    rtc_gpio_set_direction(SDA_GPIO, RTC_GPIO_MODE_DISABLED);
+    rtc_gpio_pullup_dis(SDA_GPIO);
+    rtc_gpio_pulldown_dis(SDA_GPIO);
+    rtc_gpio_deinit(SDA_GPIO);
+
     delay(10); // Give some time for the pin to stabilize
 }
 
