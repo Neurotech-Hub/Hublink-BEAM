@@ -389,6 +389,7 @@ void HublinkBEAM::sleep(uint32_t milliseconds)
     // Enable trigger mode for PIR sensor before sleep
     if (_isPIRInitialized)
     {
+        Serial.println("      - Enabling PIR trigger mode...");
         _pirSensor.enableTriggerMode();
     }
 
