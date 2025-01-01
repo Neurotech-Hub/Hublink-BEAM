@@ -34,6 +34,10 @@ void HublinkBEAM::initPins()
     pinMode(PIN_GREEN_LED, OUTPUT);
     digitalWrite(PIN_GREEN_LED, LOW); // Turn off green LED
 
+    // Initialize and hold (during deep sleep) I2C power control
+    pinMode(PIN_I2C_POWER, OUTPUT);
+    digitalWrite(PIN_I2C_POWER, HIGH);
+
     // Initialize NeoPixel power pin and pixel
     pinMode(NEOPIXEL_POWER, OUTPUT);
     digitalWrite(NEOPIXEL_POWER, HIGH);
@@ -47,15 +51,14 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
     bool allInitialized = true;
 
     Serial.println("   a. Starting I2C...");
+    Wire.begin();
+    delay(100); // Give I2C time to stabilize
+
     // Release GPIO hold if waking from sleep
     if (isWakeFromSleep)
     {
         _ulp.stop();
     }
-
-    // Initialize I2C for sensors
-    Wire.begin();
-    delay(100); // Give I2C time to stabilize
 
     Serial.println("   b. Initializing PIR sensor...");
     // Initialize PIR sensor with optimized init for wake from sleep
@@ -393,17 +396,17 @@ void HublinkBEAM::sleep(uint32_t milliseconds)
         _pirSensor.enableTriggerMode();
     }
 
-    // Start ULP program
+    Wire.end();
+
+    Serial.println("      - Starting deep sleep...");
+    Serial.flush();
+
     _ulp.start();
 
     // Configure deep sleep wakeup sources
-    Serial.println("      - Enabling ULP wakeup...");
-    ESP_ERROR_CHECK(esp_sleep_enable_ulp_wakeup());     // Enable ULP wakeup
     esp_sleep_enable_timer_wakeup(milliseconds * 1000); // Convert to microseconds
-
-    Serial.println("      - Starting deep sleep...");
     esp_deep_sleep_start();
-    // Note: Device will restart after deep sleep
+    // Note: Device will restart after deep sleep, returning to setup()
 }
 
 float HublinkBEAM::getBatteryVoltage()

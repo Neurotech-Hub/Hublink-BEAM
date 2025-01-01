@@ -10,8 +10,8 @@ void setup()
 
   if (!beam.begin())
   {
-    while (1)
-      delay(1000); // Halt if initialization failed
+    // while (1)
+    //   delay(1000); // Halt if initialization failed
   }
 }
 

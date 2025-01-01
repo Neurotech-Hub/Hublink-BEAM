@@ -45,7 +45,7 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
     const int maxAttempts = 10;
     int attempts = 0;
     int configFailures = 0;
-    const int maxConfigFailures = 3;
+    const int maxConfigFailures = 10;
 
     Serial.println("      - Starting stability check loop");
     while (attempts < maxAttempts)

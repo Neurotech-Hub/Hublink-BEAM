@@ -36,20 +36,33 @@ void ULPManager::start()
     // Clear RTC memory
     memset(RTC_SLOW_MEM, 0, CONFIG_ULP_COPROC_RESERVE_MEM);
 
-    // Configure GPIO3 for ULP
-    Serial.println("      - Configuring GPIO3 for ULP...");
+    // Configure I2C pins for ULP
+    Serial.println("      - Configuring GPIO for ULP...");
+
+    // Configure I2C power pin
+    rtc_gpio_init((gpio_num_t)PIN_I2C_POWER);
+    rtc_gpio_set_direction((gpio_num_t)PIN_I2C_POWER, RTC_GPIO_MODE_OUTPUT_ONLY);
+    rtc_gpio_set_level((gpio_num_t)PIN_I2C_POWER, 1);
+    rtc_gpio_hold_en((gpio_num_t)PIN_I2C_POWER);
+
+    // Configure SDA (GPIO3)
     rtc_gpio_init(SDA_GPIO);
     rtc_gpio_set_direction(SDA_GPIO, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_en(SDA_GPIO);
     rtc_gpio_pulldown_dis(SDA_GPIO);
     rtc_gpio_hold_en(SDA_GPIO);
 
+    // Configure SCL (GPIO4)
+    rtc_gpio_init(SCL_GPIO);
+    rtc_gpio_set_direction(SCL_GPIO, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en(SCL_GPIO);
+    rtc_gpio_pulldown_dis(SCL_GPIO);
+    rtc_gpio_hold_en(SCL_GPIO);
+
     // Load ULP program
     Serial.println("      - Loading ULP program...");
     size_t size = sizeof(ulp_program) / sizeof(ulp_insn_t);
     esp_err_t err = ulp_process_macros_and_load(PROG_START, ulp_program, &size);
-
-    return;
 
     if (err != ESP_OK)
     {
@@ -72,8 +85,10 @@ void ULPManager::start()
 
 void ULPManager::stop()
 {
-    rtc_gpio_hold_dis(SDA_GPIO); // Release the hold on GPIO3
-    delay(10);                   // Give some time for the pin to stabilize
+    rtc_gpio_hold_dis((gpio_num_t)PIN_I2C_POWER);
+    rtc_gpio_hold_dis(SDA_GPIO);
+    rtc_gpio_hold_dis(SCL_GPIO);
+    delay(10); // Give some time for the pin to stabilize
 }
 
 bool ULPManager::getEventFlag()
