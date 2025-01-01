@@ -3,21 +3,17 @@
 // https://docs.espressif.com/projects/esp-idf/en/release-v3.3/api-guides/ulp_macros.html
 // ULP program to monitor PIR trigger (GPIO3) for LOW state
 const ulp_insn_t ulp_program[] = {
-    // Read GPIO3 state
+    I_MOVI(R2, MOTION_FLAG), // set R2 to motion flag address
+
+    M_LABEL(0),
+    I_DELAY(0xFFFF), // delay for branch loop
+
+    // Read GPIO3 state into R0 (processor definitions do work on R0)
     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
+    M_BL(0, 1), // (label, value): If R0 < value, branch to label 0 else continue
 
-    // If HIGH (1), branch to delay
-    I_BG(3, 0), // Branch if greater than 0 (i.e., HIGH)
-
-    // Set motion flag (R2 = memory address 0)
-    I_MOVI(R2, 0),
-    I_MOVI(R1, 1),
-    I_ST(R1, R2, 0),
-
-    // Delay and loop
-    M_LABEL(1),
-    I_DELAY(0xFFFF),
-    M_BX(0) // Loop back to start
+    I_ST(R0, R2, 0), // (reg_val, reg_addr, offset_): store R0 (GPIO state) into motion flag
+    I_HALT(),        // Halt the ULP program
 };
 
 ULPManager::ULPManager()
@@ -34,16 +30,18 @@ void ULPManager::start()
 
     // Configure GPIO3 for ULP
     Serial.println("      - Configuring GPIO3 for ULP...");
-    rtc_gpio_init(GPIO_NUM_3);
-    rtc_gpio_set_direction(GPIO_NUM_3, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pullup_en(GPIO_NUM_3);
-    rtc_gpio_pulldown_dis(GPIO_NUM_3);
-    rtc_gpio_hold_en(GPIO_NUM_3);
+    rtc_gpio_init(SDA_GPIO);
+    rtc_gpio_set_direction(SDA_GPIO, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en(SDA_GPIO);
+    rtc_gpio_pulldown_dis(SDA_GPIO);
+    rtc_gpio_hold_en(SDA_GPIO);
 
     // Load ULP program
     Serial.println("      - Loading ULP program...");
     size_t size = sizeof(ulp_program) / sizeof(ulp_insn_t);
     esp_err_t err = ulp_process_macros_and_load(PROG_START, ulp_program, &size);
+
+    return;
 
     if (err != ESP_OK)
     {
@@ -62,6 +60,12 @@ void ULPManager::start()
 
     _initialized = true;
     Serial.println("      - ULP initialization complete");
+}
+
+void ULPManager::stop()
+{
+    rtc_gpio_hold_dis(SDA_GPIO); // Release the hold on GPIO3
+    delay(10);                   // Give some time for the pin to stabilize
 }
 
 bool ULPManager::getEventFlag()

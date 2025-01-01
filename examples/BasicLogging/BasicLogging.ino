@@ -18,6 +18,7 @@ void setup()
 void loop()
 {
   beam.logData();
+  delay(1000);
   beam.sleep(LOG_INTERVAL);
   // delay(1000);
   // Note: Device will restart after deep sleep, returning to setup()
