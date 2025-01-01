@@ -105,6 +105,12 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
     }
     else
     {
+        // Configure BME280 for forced mode with 1x oversampling
+        _envSensor.setSampling(Adafruit_BME280::MODE_FORCED,
+                               Adafruit_BME280::SAMPLING_X1, // temperature
+                               Adafruit_BME280::SAMPLING_X1, // pressure
+                               Adafruit_BME280::SAMPLING_X1, // humidity
+                               Adafruit_BME280::FILTER_OFF);
         Serial.println("        OK");
         _isEnvSensorInitialized = true;
     }
@@ -304,9 +310,6 @@ bool HublinkBEAM::logData(const char *filename)
     bool rawFlag = _ulp.getEventFlag();
     int motionFlag = rawFlag ? 1 : 0;
 
-    // Set initial NeoPixel color based on motion
-    setNeoPixel(motionFlag ? NEOPIXEL_GREEN : NEOPIXEL_PURPLE);
-
     // Check for required sensors and SD card
     if (!_isSDInitialized || !isSDCardPresent())
     {
@@ -340,6 +343,8 @@ bool HublinkBEAM::logData(const char *filename)
         }
     }
 
+    // Set initial NeoPixel color based on motion
+    setNeoPixel(motionFlag ? NEOPIXEL_GREEN : NEOPIXEL_PURPLE);
     // Open file in append mode
     File dataFile = SD.open(currentFile, FILE_APPEND);
     if (!dataFile)
@@ -351,6 +356,13 @@ bool HublinkBEAM::logData(const char *filename)
 
     // Get date/time and sensor readings
     DateTime now = getDateTime();
+
+    // Take forced measurement before reading BME280 values
+    if (_isEnvSensorInitialized)
+    {
+        _envSensor.takeForcedMeasurement();
+    }
+
     float batteryV = _isBatteryMonitorInitialized ? getBatteryVoltage() : -1.0f;
     float tempC = _isEnvSensorInitialized ? getTemperature() : -273.15f;
     float pressHpa = _isEnvSensorInitialized ? getPressure() : -1.0f;
