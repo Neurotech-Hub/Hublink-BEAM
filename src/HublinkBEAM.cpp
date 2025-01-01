@@ -57,17 +57,13 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
         _ulp.stop();
         delay(10); // Give pins time to stabilize
     }
+    else
+    {
+        _ulp.clearEventFlag(); // could be garbage at startup
+    }
 
     Wire.begin();
     delay(100); // Give I2C time to stabilize
-
-    // Release GPIO hold if waking from sleep
-    if (isWakeFromSleep)
-    {
-        Wire.beginTransmission(0x00);
-        uint8_t error = Wire.endTransmission();
-        Serial.printf("      - I2C bus state: %d (0=OK)\n", error);
-    }
 
     Serial.println("   b. Initializing PIR sensor...");
     // Initialize PIR sensor with optimized init for wake from sleep
@@ -301,9 +297,9 @@ bool HublinkBEAM::createFile(String filename)
 bool HublinkBEAM::logData(const char *filename)
 {
     Serial.println("\n\n---Logging data---");
-    // Get motion flag from ULP first
-    int motionFlag = _ulp.getEventFlag() ? 1 : 0;
-    _ulp.clearEventFlag(); // Clear after reading
+
+    bool rawFlag = _ulp.getEventFlag();
+    int motionFlag = rawFlag ? 1 : 0;
 
     // Set initial NeoPixel color based on motion
     setNeoPixel(motionFlag ? NEOPIXEL_GREEN : NEOPIXEL_PURPLE);
@@ -412,9 +408,6 @@ void HublinkBEAM::sleep(uint32_t milliseconds)
 
     // Configure deep sleep wakeup sources
     esp_sleep_enable_timer_wakeup(milliseconds * 1000); // Convert to microseconds
-
-    Serial.println("      - Starting deep sleep...");
-    Serial.flush();
     esp_deep_sleep_start();
     // Note: Device will restart after deep sleep, returning to setup()
 }

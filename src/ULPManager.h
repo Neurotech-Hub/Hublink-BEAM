@@ -7,12 +7,14 @@
 #include "soc/rtc_io_reg.h"
 
 // Move constants outside the class
-static const uint32_t MOTION_FLAG = 0; // RTC memory index for motion flag
-static const uint32_t PROG_START = 1;  // Program start address
+enum
+{
+    MOTION_FLAG, // Your existing motion flag location
+    PROG_START   // Program start address
+};
 
 // ESP32-S3 specific GPIO mappings
 #define SDA_GPIO GPIO_NUM_3 // GPIO3 for SDA
-#define SCL_GPIO GPIO_NUM_4 // GPIO4 for SCL
 
 class ULPManager
 {

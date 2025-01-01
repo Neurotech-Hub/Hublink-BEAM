@@ -1,0 +1,60 @@
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Arduino build files
+build/
+*.hex
+*.elf
+*.bin
+
+# Dependency directories
+libraries/
+
+# Debug files
+*.log
+
+# Backup files
+*.bak
+*~
+*.swp
+*.swo
+
+# IDE specific (except .vscode)
+.idea/
+*.iml
+.project
+.cproject
+.settings/
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app 
