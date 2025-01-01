@@ -1,12 +1,12 @@
 #include <HublinkBEAM.h>
 
 HublinkBEAM beam;
-const unsigned long LOG_INTERVAL = 5000; // Log every 5 seconds
+const unsigned long LOG_INTERVAL = 60000; // Log every 5 seconds
 
 void setup()
 {
   Serial.begin(115200);
-  delay(1000);
+  // delay(1000);
 
   if (!beam.begin())
   {
@@ -18,8 +18,6 @@ void setup()
 void loop()
 {
   beam.logData();
-  delay(1000);
   beam.sleep(LOG_INTERVAL);
-  // delay(1000);
   // Note: Device will restart after deep sleep, returning to setup()
 }

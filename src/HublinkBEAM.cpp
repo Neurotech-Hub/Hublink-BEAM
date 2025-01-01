@@ -144,6 +144,9 @@ bool HublinkBEAM::begin()
 {
     bool allInitialized = true;
 
+    // Set CPU frequency to 80MHz
+    setCpuFrequencyMhz(80);
+
     Serial.println("Initializing BEAM...");
     Serial.println("1. Initializing pins...");
 
