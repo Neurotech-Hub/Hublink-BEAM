@@ -5,15 +5,23 @@
 const ulp_insn_t ulp_program[] = {
     I_MOVI(R2, MOTION_FLAG), // set R2 to motion flag address
 
-    M_LABEL(0),
+    M_LABEL(1),      // Main loop label
     I_DELAY(0xFFFF), // delay for branch loop
 
-    // Read GPIO3 state into R0 (processor definitions do work on R0)
+    // Read GPIO3 state into R0
     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
-    M_BL(0, 1), // (label, value): If R0 < value, branch to label 0 else continue
 
-    I_ST(R0, R2, 0), // (reg_val, reg_addr, offset_): store R0 (GPIO state) into motion flag
-    I_HALT(),        // Halt the ULP program
+    // If GPIO is LOW (motion detected), store state and halt
+    M_BL(2, 1), // If R0 < 1 (LOW), branch to store/halt
+
+    // Otherwise loop back to start
+    M_BX(1), // Branch back to delay
+
+    I_WR_REG(RTC_GPIO_OUT_REG, LED_BUILTIN + RTC_GPIO_OUT_DATA_S, LED_BUILTIN + RTC_GPIO_OUT_DATA_S, 1), // LED ON
+
+    M_LABEL(2),      // Store and halt label
+    I_ST(R0, R2, 0), // Store GPIO state into motion flag
+    I_HALT(),        // Halt until next timer wake
 };
 
 ULPManager::ULPManager()

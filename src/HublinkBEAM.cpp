@@ -382,6 +382,10 @@ bool HublinkBEAM::logData(const char *filename)
 
 void HublinkBEAM::sleep(uint32_t milliseconds)
 {
+    disableNeoPixel();
+    digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(PIN_GREEN_LED, LOW);
+
     // Enable trigger mode for PIR sensor before sleep
     if (_isPIRInitialized)
     {
