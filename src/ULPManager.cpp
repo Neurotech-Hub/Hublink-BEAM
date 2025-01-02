@@ -5,7 +5,8 @@
 const ulp_insn_t ulp_program[] = {
     I_MOVI(R2, MOTION_FLAG), // set R2 to motion flag address
 
-    M_LABEL(1), // Main loop label
+    M_LABEL(1),   // Main loop label
+    I_DELAY(200), // ~11.4µs delay @ 17.5MHz (57ns per cycle)
 
     // Read GPIO3 state into R0
     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
