@@ -38,7 +38,7 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
     _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_B;
 
     // Write config and check Peak Hold until stable
-    const int maxAttempts = 10;
+    const int maxAttempts = 50;
     int attempts = 0;
     int configFailures = 0;
     const int maxConfigFailures = 10;
@@ -74,7 +74,7 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
         }
 
         attempts++;
-        delay(ZDP323_TCYC_MS);
+        delay(ZDP323_TCYC_MS * 10);
     }
 
     if (attempts >= maxAttempts)

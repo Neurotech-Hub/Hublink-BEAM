@@ -154,14 +154,14 @@ bool HublinkBEAM::begin()
     bool isWakeFromSleep = isWakeFromDeepSleep();
     Serial.printf("    Wake from sleep: %s\n", isWakeFromSleep ? "YES" : "NO");
 
-    // Initialize sensors (with optimization if waking from sleep)
-    if (!initSensors(isWakeFromSleep))
+    // Always reinitialize SD card after deep sleep
+    if (!initSD())
     {
         allInitialized = false;
     }
 
-    // Always reinitialize SD card after deep sleep
-    if (!initSD())
+    // Initialize sensors (with optimization if waking from sleep), skip if SD card failed
+    if (!initSensors(isWakeFromSleep) && allInitialized)
     {
         allInitialized = false;
     }
