@@ -42,8 +42,8 @@ void HublinkBEAM::initPins()
     pinMode(NEOPIXEL_POWER, OUTPUT);
     digitalWrite(NEOPIXEL_POWER, HIGH);
     _pixel.begin();
-    _pixel.setBrightness(20); // Set to low brightness
-    _pixel.show();            // Initialize all pixels to 'off'
+    _pixel.setBrightness(NEOPIXEL_DIM); // Set to low brightness
+    _pixel.show();                      // Initialize all pixels to 'off'
 }
 
 bool HublinkBEAM::initSensors(bool isWakeFromSleep)
@@ -74,6 +74,21 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
     }
     else
     {
+        if (!isWakeFromSleep)
+        {
+            // Blink blue pixel during stabilization period
+            const int blinkDelay = 200;                               // 200ms between toggles
+            const int numBlinks = ZDP323_TSTAB_MS / (blinkDelay * 2); // Calculate number of complete blink cycles
+
+            for (int i = 0; i < numBlinks; i++)
+            {
+                setNeoPixel(NEOPIXEL_BLUE);
+                delay(blinkDelay);
+                disableNeoPixel();
+                delay(blinkDelay);
+            }
+            disableNeoPixel();
+        }
         Serial.println("      PIR sensor OK");
         _isPIRInitialized = true;
     }
@@ -158,7 +173,7 @@ bool HublinkBEAM::begin()
 
     // Initialize pins and set NeoPixel to blue during initialization
     initPins();
-    setNeoPixel(NEOPIXEL_BLUE);
+    setNeoPixel(NEOPIXEL_BLUE); // on only for initSensors() (or error)
 
     Serial.println("2. Checking wake status...");
     // Check if this is a wake from deep sleep
@@ -176,6 +191,7 @@ bool HublinkBEAM::begin()
     {
         Serial.println("   Sensors initialized successfully");
     }
+    disableNeoPixel();
 
     Serial.println("4. Initializing SD card...");
     // Always reinitialize SD card after deep sleep
@@ -551,15 +567,6 @@ DateTime HublinkBEAM::getDateTime()
         return DateTime(SECONDS_FROM_1970_TO_2000); // Use RTClib's default epoch
     }
     return _rtc.now();
-}
-
-float HublinkBEAM::getRTCTemperature()
-{
-    if (!_isRTCInitialized)
-    {
-        return -273.15;
-    }
-    return _rtc.getTemperature();
 }
 
 String HublinkBEAM::getDayOfWeek()

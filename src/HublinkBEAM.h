@@ -12,12 +12,13 @@
 #include "RTCManager.h"
 #include "ULPManager.h"
 #include <Adafruit_NeoPixel.h>
-#include "esp_sleep.h"
+#include "esp_sleep.h"`
 
 // Pin Definitions
 #define PIN_SD_CS 12    // SD card chip select
 #define PIN_SD_DET 11   // SD card detection pin
 #define PIN_GREEN_LED 5 // On-board green LED
+#define NEOPIXEL_DIM 2
 
 // NeoPixel Colors
 #define NEOPIXEL_OFF 0x000000
@@ -69,7 +70,6 @@ public:
 
     // RTC functions
     DateTime getDateTime();
-    float getRTCTemperature();
     String getDayOfWeek();
     uint32_t getUnixTime();
     void adjustRTC(uint32_t timestamp);

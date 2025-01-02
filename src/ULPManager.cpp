@@ -31,13 +31,6 @@ void ULPManager::start()
 {
     Serial.println("      - Initializing ULP...");
 
-    // Print first 16 elements of RTC_SLOW_MEM
-    Serial.println("      - RTC_SLOW_MEM contents:");
-    for (int i = 0; i < 16; i++)
-    {
-        Serial.printf("        [%2d] = 0x%08x\n", i, RTC_SLOW_MEM[i]);
-    }
-
     // Clear RTC memory
     memset(RTC_SLOW_MEM, 0, CONFIG_ULP_COPROC_RESERVE_MEM);
 

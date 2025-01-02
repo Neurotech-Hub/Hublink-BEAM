@@ -47,11 +47,6 @@ DateTime RTCManager::now()
     return _rtc.now();
 }
 
-float RTCManager::getTemperature()
-{
-    return _rtc.getTemperature();
-}
-
 void RTCManager::serialPrintDateTime()
 {
     DateTime current = now();
@@ -96,7 +91,21 @@ DateTime RTCManager::getFutureTime(int days, int hours, int minutes, int seconds
 
 String RTCManager::getCompileDateTime()
 {
-    return String(__DATE__) + " " + String(__TIME__);
+    const char *date = __DATE__;
+    const char *time = __TIME__;
+    char compileDateTime[20];
+
+    Serial.println("\nCompile time details:");
+    Serial.println("--------------------");
+    Serial.printf("__DATE__: %s\n", date);
+    Serial.printf("__TIME__: %s\n", time);
+
+    // Convert compile date/time to string
+    snprintf(compileDateTime, sizeof(compileDateTime), "%s %s", date, time);
+    Serial.printf("Combined: %s\n", compileDateTime);
+    Serial.println("--------------------\n");
+
+    return String(compileDateTime);
 }
 
 DateTime RTCManager::getCompensatedDateTime()
@@ -124,16 +133,36 @@ bool RTCManager::isNewCompilation()
 {
     _preferences.begin(PREFS_NAMESPACE, false);
     const String currentCompileTime = getCompileDateTime();
-    const String storedCompileTime = _preferences.getString("compileTime", "");
+    String storedCompileTime = _preferences.getString("compileTime", "");
+
+    Serial.println("\nChecking compilation status:");
+    Serial.println("---------------------------");
+    Serial.println("Current compile time: " + currentCompileTime);
+    Serial.println("Stored compile time:  " + storedCompileTime);
+    Serial.println("Is new compilation:   " + String(currentCompileTime != storedCompileTime));
+    Serial.println("---------------------------\n");
+
     _preferences.end();
-    return (storedCompileTime != currentCompileTime);
+    return currentCompileTime != storedCompileTime;
 }
 
 void RTCManager::updateCompilationID()
 {
     _preferences.begin(PREFS_NAMESPACE, false);
     const String currentCompileTime = getCompileDateTime();
+
+    Serial.println("\nUpdating compilation ID:");
+    Serial.println("----------------------");
+    Serial.println("Storing new compile time: " + currentCompileTime);
+
     _preferences.putString("compileTime", currentCompileTime.c_str());
+
+    // Verify storage
+    String verifyTime = _preferences.getString("compileTime", "");
+    Serial.println("Verified stored time:    " + verifyTime);
+    Serial.println("Storage successful:      " + String(verifyTime == currentCompileTime));
+    Serial.println("----------------------\n");
+
     _preferences.end();
 }
 

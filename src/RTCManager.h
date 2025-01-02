@@ -16,7 +16,6 @@ public:
 
     // Basic RTC functions
     DateTime now();
-    float getTemperature();
     void serialPrintDateTime();
 
     // Time adjustment functions

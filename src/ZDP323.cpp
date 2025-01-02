@@ -103,7 +103,6 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
         return false;
     }
 
-    delay(ZDP323_TSTAB_MS);
     _initialized = true;
     Serial.println("      - PIR initialization complete");
     return true;
