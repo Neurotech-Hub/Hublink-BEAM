@@ -29,13 +29,8 @@ ULPManager::ULPManager()
 
 void ULPManager::start()
 {
-    Serial.println("      - Initializing ULP...");
-
     // Clear RTC memory
     memset(RTC_SLOW_MEM, 0, CONFIG_ULP_COPROC_RESERVE_MEM);
-
-    // Configure I2C pins for ULP
-    Serial.println("      - Configuring GPIO for ULP...");
 
     // Configure I2C power pin
     rtc_gpio_init((gpio_num_t)PIN_I2C_POWER);
@@ -51,27 +46,23 @@ void ULPManager::start()
     rtc_gpio_hold_en(SDA_GPIO);
 
     // Load ULP program
-    Serial.println("      - Loading ULP program...");
     size_t size = sizeof(ulp_program) / sizeof(ulp_insn_t);
     esp_err_t err = ulp_process_macros_and_load(PROG_START, ulp_program, &size);
 
     if (err != ESP_OK)
     {
-        Serial.printf("      - ULP program load error: %d\n", err);
+        Serial.printf("***ULP program load error: %d***\n", err);
         return;
     }
 
-    // Start ULP program
-    Serial.println("      - Starting ULP program...");
     err = ulp_run(PROG_START);
     if (err != ESP_OK)
     {
-        Serial.printf("      - Error starting ULP program: %d\n", err);
+        Serial.printf("***Error starting ULP program: %d***\n", err);
         return;
     }
 
     _initialized = true;
-    Serial.println("      - ULP initialization complete");
 }
 
 void ULPManager::stop()

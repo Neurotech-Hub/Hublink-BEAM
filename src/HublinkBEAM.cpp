@@ -50,10 +50,8 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
 {
     bool allInitialized = true;
 
-    Serial.println("   a. Starting I2C...");
     if (isWakeFromSleep)
     {
-        Serial.println("      - Waking from sleep, stopping ULP...");
         _ulp.stop();
         delay(10); // Give pins time to stabilize
     }
@@ -65,56 +63,37 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
     Wire.begin();
     delay(100); // Give I2C time to stabilize
 
-    Serial.println("   b. Initializing PIR sensor...");
     // Initialize PIR sensor with optimized init for wake from sleep
     if (!_pirSensor.begin(Wire, isWakeFromSleep))
     {
-        Serial.println("      PIR sensor failed");
         allInitialized = false;
     }
     else
     {
         if (!isWakeFromSleep)
         {
-            // Blink blue pixel during stabilization period
-            const int blinkDelay = 200;                               // 200ms between toggles
-            const int numBlinks = ZDP323_TSTAB_MS / (blinkDelay * 2); // Calculate number of complete blink cycles
-
-            for (int i = 0; i < numBlinks; i++)
-            {
-                setNeoPixel(NEOPIXEL_BLUE);
-                delay(blinkDelay);
-                disableNeoPixel();
-                delay(blinkDelay);
-            }
-            disableNeoPixel();
+            // Wait for PIR sensor stabilization period
+            esp_sleep_enable_timer_wakeup(ZDP323_TSTAB_MS * 1000); // Convert ms to microseconds
+            esp_light_sleep_start();
         }
-        Serial.println("      PIR sensor OK");
         _isPIRInitialized = true;
     }
 
     // Always initialize I2C devices, but with optimized init for wake from sleep
-    Serial.println(isWakeFromSleep ? "   c. Re-initializing I2C devices after sleep..." : "   c. Initializing I2C devices...");
-
     // Initialize battery monitor
-    Serial.println("      - Battery monitor...");
     if (!_batteryMonitor.begin(&Wire))
     {
-        Serial.println("        Failed");
         allInitialized = false;
         _isBatteryMonitorInitialized = false;
     }
     else
     {
-        Serial.println("        OK");
         _isBatteryMonitorInitialized = true;
     }
 
     // Initialize environmental sensor
-    Serial.println("      - Environmental sensor...");
     if (!_envSensor.begin())
     {
-        Serial.println("        Failed");
         allInitialized = false;
         _isEnvSensorInitialized = false;
     }
@@ -126,35 +105,28 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
                                Adafruit_BME280::SAMPLING_X1, // pressure
                                Adafruit_BME280::SAMPLING_X1, // humidity
                                Adafruit_BME280::FILTER_OFF);
-        Serial.println("        OK");
         _isEnvSensorInitialized = true;
     }
 
     // Initialize light sensor
-    Serial.println("      - Light sensor...");
     if (!_lightSensor.begin())
     {
-        Serial.println("        Failed");
         allInitialized = false;
         _isLightSensorInitialized = false;
     }
     else
     {
-        Serial.println("        OK");
         _isLightSensorInitialized = true;
     }
 
     // Initialize RTC
-    Serial.println("      - RTC...");
     if (!_rtc.begin())
     {
-        Serial.println("        Failed");
         allInitialized = false;
         _isRTCInitialized = false;
     }
     else
     {
-        Serial.println("        OK");
         _isRTCInitialized = true;
     }
 
@@ -169,40 +141,25 @@ bool HublinkBEAM::begin()
     setCpuFrequencyMhz(80);
 
     Serial.println("Initializing BEAM...");
-    Serial.println("1. Initializing pins...");
 
     // Initialize pins and set NeoPixel to blue during initialization
     initPins();
-    setNeoPixel(NEOPIXEL_BLUE); // on only for initSensors() (or error)
+    setNeoPixel(NEOPIXEL_BLUE);
 
-    Serial.println("2. Checking wake status...");
     // Check if this is a wake from deep sleep
     bool isWakeFromSleep = isWakeFromDeepSleep();
-    Serial.printf("   Wake from sleep: %s\n", isWakeFromSleep ? "YES" : "NO");
+    Serial.printf("    Wake from sleep: %s\n", isWakeFromSleep ? "YES" : "NO");
 
-    Serial.println("3. Initializing sensors...");
     // Initialize sensors (with optimization if waking from sleep)
     if (!initSensors(isWakeFromSleep))
     {
-        Serial.println("   Sensor initialization failed");
         allInitialized = false;
     }
-    else
-    {
-        Serial.println("   Sensors initialized successfully");
-    }
-    disableNeoPixel();
 
-    Serial.println("4. Initializing SD card...");
     // Always reinitialize SD card after deep sleep
     if (!initSD())
     {
-        Serial.println("   SD card initialization failed");
         allInitialized = false;
-    }
-    else
-    {
-        Serial.println("   SD card initialized successfully");
     }
 
     // Only print full initialization report on first boot
@@ -237,9 +194,7 @@ bool HublinkBEAM::begin()
         setNeoPixel(NEOPIXEL_RED); // Red if there were any failures
     }
 
-    Serial.println("5. Initialization complete.");
     Serial.flush();
-
     firstBoot = false;
     return allInitialized;
 }
@@ -273,7 +228,6 @@ bool HublinkBEAM::initSD()
     }
 
     _isSDInitialized = true;
-    Serial.println("SD card initialized successfully");
     return true;
 }
 
@@ -428,11 +382,10 @@ void HublinkBEAM::sleep(uint32_t milliseconds)
     // Enable trigger mode for PIR sensor before sleep
     if (_isPIRInitialized)
     {
-        Serial.println("      - Enabling PIR trigger mode...");
         _pirSensor.enableTriggerMode();
     }
 
-    Serial.println("      - Starting deep sleep...");
+    Serial.println("\n\nENTERING DEEP SLEEP\n\n");
     Serial.flush();
 
     _ulp.start();

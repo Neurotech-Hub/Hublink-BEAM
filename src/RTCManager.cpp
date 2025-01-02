@@ -57,11 +57,7 @@ void RTCManager::serialPrintDateTime()
 
 void RTCManager::adjustRTC(uint32_t timestamp)
 {
-    Serial.println("Adjusting RTC with Unix timestamp: " + String(timestamp));
     _rtc.adjust(DateTime(timestamp));
-    Serial.print("RTC time after adjustment: ");
-    serialPrintDateTime();
-    Serial.println();
 }
 
 void RTCManager::adjustRTC(const DateTime &dt)
@@ -94,17 +90,8 @@ String RTCManager::getCompileDateTime()
     const char *date = __DATE__;
     const char *time = __TIME__;
     char compileDateTime[20];
-
-    Serial.println("\nCompile time details:");
-    Serial.println("--------------------");
-    Serial.printf("__DATE__: %s\n", date);
-    Serial.printf("__TIME__: %s\n", time);
-
     // Convert compile date/time to string
     snprintf(compileDateTime, sizeof(compileDateTime), "%s %s", date, time);
-    Serial.printf("Combined: %s\n", compileDateTime);
-    Serial.println("--------------------\n");
-
     return String(compileDateTime);
 }
 
@@ -169,9 +156,6 @@ void RTCManager::updateCompilationID()
 void RTCManager::updateRTC()
 {
     String compileDateTime = getCompileDateTime();
-    Serial.println("\nRTC Time Update:");
-    Serial.println("---------------");
-    Serial.println("Compilation time: " + compileDateTime);
 
     // Get compensated DateTime
     DateTime compensatedTime = getCompensatedDateTime();
@@ -181,8 +165,6 @@ void RTCManager::updateRTC()
     snprintf(timeStr, sizeof(timeStr), "%04d-%02d-%02d %02d:%02d:%02d",
              compensatedTime.year(), compensatedTime.month(), compensatedTime.day(),
              compensatedTime.hour(), compensatedTime.minute(), compensatedTime.second());
-    Serial.println("Adding " + String(UPLOAD_DELAY_SECONDS) + " seconds compensation");
-    Serial.println("Adjusted time:   " + String(timeStr));
 
     // Update RTC with compensated time
     _rtc.adjust(compensatedTime);
@@ -193,6 +175,4 @@ void RTCManager::updateRTC()
     snprintf(currentTimeStr, sizeof(currentTimeStr), "%04d-%02d-%02d %02d:%02d:%02d",
              currentTime.year(), currentTime.month(), currentTime.day(),
              currentTime.hour(), currentTime.minute(), currentTime.second());
-    Serial.println("Final RTC time: " + String(currentTimeStr));
-    Serial.println("---------------");
 }

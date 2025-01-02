@@ -12,18 +12,16 @@ ZDP323::ZDP323(uint8_t i2cAddress)
 
 bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
 {
-    Serial.println("      - Setting up I2C connection...");
     _wire = &wirePort;
     _wire->setTimeout(3000);
 
     // If waking from sleep, we need to disable trigger mode first
     if (isWakeFromSleep)
     {
-        Serial.println("      - Wake from sleep, disabling trigger mode");
         _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
         if (!writeConfig())
         {
-            Serial.println("      - Failed to disable trigger mode");
+            Serial.println("***Failed to disable trigger mode***");
             return false;
         }
         _initialized = true;
@@ -31,10 +29,8 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
     }
 
     // Full initialization for first boot
-    Serial.println("      - Starting full initialization");
     delay(500); // Only delay on first power-up
 
-    Serial.println("      - Setting initial config");
     // Initial configuration with maximum threshold and trigger mode disabled
     _config.detlvl = 0xFF;
     _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
@@ -47,18 +43,14 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
     int configFailures = 0;
     const int maxConfigFailures = 10;
 
-    Serial.println("      - Starting stability check loop");
     while (attempts < maxAttempts)
     {
-        Serial.printf("        Attempt %d/%d\n", attempts + 1, maxAttempts);
-
         if (!writeConfig())
         {
             configFailures++;
-            Serial.printf("        Config write failed (%d/%d)\n", configFailures, maxConfigFailures);
             if (configFailures >= maxConfigFailures)
             {
-                Serial.println("        Max config failures exceeded");
+                Serial.printf("***Config write failed (%d/%d)***\n", configFailures, maxConfigFailures);
                 return false;
             }
             delay(100);
@@ -70,18 +62,15 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
         int16_t peakHold;
         if (!readPeakHold(&peakHold))
         {
-            Serial.println("        Peak hold read failed");
             attempts++;
             continue;
         }
 
         int16_t halfThreshold = (0xFF * 8) / 2;
-        Serial.printf("        Peak hold: %d (threshold: ±%d)\n", peakHold, halfThreshold);
 
         if (abs(peakHold) < halfThreshold)
         {
-            Serial.println("        Stability achieved");
-            break;
+            break; // Stability achieved
         }
 
         attempts++;
@@ -90,27 +79,24 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
 
     if (attempts >= maxAttempts)
     {
-        Serial.println("        Failed to achieve stability");
+        Serial.println("***Failed to achieve stability***");
         return false;
     }
 
-    Serial.println("      - Writing final configuration");
     // Write final configuration with desired threshold (trigger mode still disabled)
     _config.detlvl = ZDP323_CONFIG_DETLVL_DEFAULT;
     if (!writeConfig())
     {
-        Serial.println("        Final config write failed");
+        Serial.println("***Final config write failed***");
         return false;
     }
 
     _initialized = true;
-    Serial.println("      - PIR initialization complete");
     return true;
 }
 
 bool ZDP323::writeConfig()
 {
-    Serial.println("        Writing config...");
     // Configuration is 56 bits (7 bytes) sent MSB first
     uint8_t data[7] = {0}; // All reserved bits default to 0
 
@@ -125,21 +111,14 @@ bool ZDP323::writeConfig()
     // Byte 5: Lower bit of DETLVL (bit 15) and reserved bits
     data[5] = (_config.detlvl & 0x01) << 7;
 
-    Serial.printf("        FILSEL=%d, FSTEP=%d, TRIGOM=%d, DETLVL=%d\n",
-                  _config.filsel, _config.fstep, _config.trigom, _config.detlvl);
-
     // Start transmission
     _wire->beginTransmission(_i2cAddress);
     _wire->write(data, 7);
     uint8_t result = _wire->endTransmission(true);
 
-    if (result == 0)
+    if (result != 0)
     {
-        Serial.println("        Config write successful");
-    }
-    else
-    {
-        Serial.printf("        Config write failed with error %d\n", result);
+        Serial.printf("***Config write failed with error %d***\n", result);
     }
 
     return result == 0;
@@ -149,7 +128,7 @@ bool ZDP323::readPeakHold(int16_t *peakHold)
 {
     if (!peakHold)
     {
-        Serial.println("        Peak hold read failed: null pointer");
+        Serial.printf("***Peak hold read failed: null pointer***\n");
         return false;
     }
 
@@ -157,7 +136,6 @@ bool ZDP323::readPeakHold(int16_t *peakHold)
     uint8_t bytesRead = _wire->requestFrom(_i2cAddress, (uint8_t)2);
     if (bytesRead != 2)
     {
-        Serial.printf("        Peak hold read failed: requested 2 bytes, got %d\n", bytesRead);
         return false;
     }
 
@@ -170,7 +148,6 @@ bool ZDP323::readPeakHold(int16_t *peakHold)
     *peakHold <<= 4; // Sign extend
     *peakHold >>= 4;
 
-    Serial.printf("        Peak hold read: %d (MSB: 0x%02X, LSB: 0x%02X)\n", *peakHold, msb, lsb);
     return true;
 }
 
