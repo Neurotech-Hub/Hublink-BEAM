@@ -89,6 +89,10 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
     else
     {
         _isBatteryMonitorInitialized = true;
+        if (isWakeFromSleep)
+        {
+            _batteryMonitor.sleep(false); // Wake from sleep mode
+        }
     }
 
     // Initialize environmental sensor
@@ -275,8 +279,6 @@ bool HublinkBEAM::createFile(String filename)
 
 bool HublinkBEAM::logData(const char *filename)
 {
-    Serial.println("\n\n---Logging data---");
-
     bool rawFlag = _ulp.getEventFlag();
     int motionFlag = rawFlag ? 1 : 0;
 
@@ -309,20 +311,22 @@ bool HublinkBEAM::logData(const char *filename)
         if (!createFile(currentFile))
         {
             setNeoPixel(NEOPIXEL_RED);
+            delay(1000); // linger for a moment on error
             return false;
         }
     }
-
-    // Set initial NeoPixel color based on motion
-    setNeoPixel(motionFlag ? NEOPIXEL_GREEN : NEOPIXEL_PURPLE);
     // Open file in append mode
     File dataFile = SD.open(currentFile, FILE_APPEND);
     if (!dataFile)
     {
         Serial.println("Failed to open file for logging: " + currentFile);
         setNeoPixel(NEOPIXEL_RED);
+        delay(1000); // linger for a moment on error
         return false;
     }
+
+    // Set initial NeoPixel color based on motion
+    setNeoPixel(motionFlag ? NEOPIXEL_GREEN : NEOPIXEL_BLUE);
 
     // Get date/time and sensor readings
     DateTime now = getDateTime();
@@ -367,6 +371,7 @@ bool HublinkBEAM::logData(const char *filename)
     {
         Serial.println("Failed to write to file: " + currentFile);
         setNeoPixel(NEOPIXEL_RED); // Show error state
+        delay(1000);               // linger for a moment on error
     }
     Serial.flush();
 
@@ -383,6 +388,13 @@ void HublinkBEAM::sleep(uint32_t milliseconds)
     if (_isPIRInitialized)
     {
         _pirSensor.enableTriggerMode();
+    }
+
+    // Put battery monitor into sleep mode before deep sleep
+    if (_isBatteryMonitorInitialized)
+    {
+        _batteryMonitor.enableSleep(true); // Enable sleep capability
+        _batteryMonitor.sleep(true);       // Enter sleep mode
     }
 
     Serial.println("\n\nENTERING DEEP SLEEP\n\n");

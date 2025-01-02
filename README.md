@@ -17,10 +17,9 @@ See the examples folder for detailed usage examples:
 
 - [ ] VEM7700 has low power modes (in library); reduces from ~13µA to ~5µA
 - [x] BME280 has low power modes (in library); reduces from ~650µA to ~10µA
-- [ ] ZDP323 has low power modes?
-- [ ] MAX17048 has hibernation mode (in library); reduces from ~23µA to ~4µA
+- [x] MAX17048 has hibernation mode (in library); reduces from ~23µA to ~4µA
 - [ ] SD card draws ~1200µA; could optimize
-- [x] ZDP323 draws ~8µA
+- [x] ZDP323 draws ~8µA (no low power mode)
 
 ## License
 
