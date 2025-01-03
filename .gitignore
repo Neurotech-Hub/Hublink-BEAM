@@ -58,3 +58,4 @@ libraries/
 *.exe
 *.out
 *.app 
+~*.xlsx

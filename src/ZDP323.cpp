@@ -35,7 +35,7 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
     _config.detlvl = 0xFF;
     _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
     _config.fstep = ZDP323_CONFIG_FSTEP_2;
-    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_B;
+    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_C;
 
     // Write config and check Peak Hold until stable
     const int maxAttempts = 50;
