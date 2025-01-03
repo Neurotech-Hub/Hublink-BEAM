@@ -57,7 +57,7 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
     }
     else
     {
-        _ulp.clearEventFlag(); // could be garbage at startup
+        _ulp.clearPIRCount(); // could be garbage at startup
     }
 
     Wire.begin();
@@ -279,8 +279,8 @@ bool HublinkBEAM::createFile(String filename)
 
 bool HublinkBEAM::logData(const char *filename)
 {
-    bool rawFlag = _ulp.getEventFlag();
-    int motionFlag = rawFlag ? 1 : 0;
+    uint16_t motionCount = _ulp.getPIRCount();
+    _ulp.clearPIRCount(); // Reset counter after reading
 
     // Check for required sensors and SD card
     if (!_isSDInitialized || !isSDCardPresent())
@@ -326,7 +326,7 @@ bool HublinkBEAM::logData(const char *filename)
     }
 
     // Set initial NeoPixel color based on motion
-    setNeoPixel(motionFlag ? NEOPIXEL_GREEN : NEOPIXEL_BLUE);
+    setNeoPixel(motionCount ? NEOPIXEL_GREEN : NEOPIXEL_BLUE);
 
     // Get date/time and sensor readings
     DateTime now = getDateTime();
@@ -355,7 +355,7 @@ bool HublinkBEAM::logData(const char *filename)
              pressHpa,
              humidity,
              lux,
-             motionFlag);
+             motionCount);
 
     // Write data
     bool success = dataFile.println(dataString);
@@ -378,8 +378,10 @@ bool HublinkBEAM::logData(const char *filename)
     return success;
 }
 
-void HublinkBEAM::sleep(uint32_t milliseconds)
+void HublinkBEAM::sleep(uint32_t seconds)
 {
+    // Convert seconds to microseconds (1 second = 1,000,000 microseconds)
+    uint64_t microseconds = seconds * 1000000ULL;
     disableNeoPixel();
     digitalWrite(LED_BUILTIN, LOW);
     digitalWrite(PIN_GREEN_LED, LOW);
@@ -403,7 +405,7 @@ void HublinkBEAM::sleep(uint32_t milliseconds)
     _ulp.start();
 
     // Configure deep sleep wakeup sources
-    esp_sleep_enable_timer_wakeup(milliseconds * 1000); // Convert to microseconds
+    esp_sleep_enable_timer_wakeup(microseconds); // Convert to microseconds
     esp_deep_sleep_start();
     // Note: Device will restart after deep sleep, returning to setup()
 }

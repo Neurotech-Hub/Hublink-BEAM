@@ -1,26 +1,36 @@
 #include "ULPManager.h"
 
-// https://docs.espressif.com/projects/esp-idf/en/release-v3.3/api-guides/ulp_macros.html
-// ULP program to monitor PIR trigger (GPIO3) for LOW state
+// ULP program to count PIR trigger pulses (GPIO3)
 const ulp_insn_t ulp_program[] = {
-    I_MOVI(R2, MOTION_FLAG), // set R2 to motion flag address
+    I_MOVI(R2, PIR_COUNT), // R2 = address of counter
+    I_LD(R1, R2, 0),       // R1 = current count
 
-    M_LABEL(1),   // Main loop label
-    I_DELAY(200), // ~11.4µs delay @ 17.5MHz (57ns per cycle)
+    M_LABEL(1),      // Main loop label
+    I_DELAY(0xFFFF), // Max delay (~374.5µs)
 
     // Read GPIO3 state into R0
     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
 
-    // If GPIO is LOW (motion detected), store state and halt
-    M_BL(2, 1), // (label_num, imm_value); if R0 < 1 (LOW), branch to store/halt
+    // If GPIO is not LOW, continue monitoring
+    M_BG(1, 0), // if R0 > 0, continue monitoring
 
-    // Otherwise loop back to start
-    M_BX(1), // Branch back to delay
+    // Motion detected (LOW), increment counter
+    I_ADDI(R1, R1, 1), // Increment count
+    I_ST(R1, R2, 0),   // Store updated count
 
-    M_LABEL(2),      // Store and halt label
-    I_MOVI(R0, 1),   // Load 1 into R0
-    I_ST(R0, R2, 0), // Store 1 into motion flag
-    I_HALT(),        // Halt until next timer wake
+    // Initialize delay counter
+    I_MOVI(R3, 0), // R3 = delay counter
+
+    // Delay loop for 1 second
+    M_LABEL(2),        // Delay loop label
+    I_DELAY(0xFFFF),   // Max delay (~374.5µs)
+    I_ADDI(R3, R3, 1), // Increment delay counter
+    I_MOVI(R0, 2669),  // Load comparison value
+    M_BG(3, R0),       // If counter > 2669, exit delay
+    M_BX(2),           // Otherwise continue delay loop
+
+    M_LABEL(3), // Delay complete
+    M_BX(1),    // Return to main monitoring loop
 };
 
 ULPManager::ULPManager()
@@ -85,16 +95,12 @@ void ULPManager::stop()
     delay(10); // Give some time for the pin to stabilize
 }
 
-bool ULPManager::getEventFlag()
+uint16_t ULPManager::getPIRCount()
 {
-    // Access the specific 16-bit value within the 32-bit word
-    uint16_t flag = (RTC_SLOW_MEM[MOTION_FLAG] & 0xFFFF);
-    return flag != 0;
+    return (uint16_t)(RTC_SLOW_MEM[PIR_COUNT] & 0xFFFF);
 }
 
-// not needed after boot since we wipe the memory in start()
-void ULPManager::clearEventFlag()
+void ULPManager::clearPIRCount()
 {
-    // Clear only the lower 16 bits
-    RTC_SLOW_MEM[MOTION_FLAG] &= 0xFFFF0000;
+    RTC_SLOW_MEM[PIR_COUNT] = 0;
 }

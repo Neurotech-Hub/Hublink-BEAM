@@ -40,7 +40,7 @@ public:
     bool begin();
     bool initSD();
     bool logData(const char *filename = nullptr);
-    void sleep(uint32_t milliseconds); // Enter deep sleep for specified duration
+    void sleep(uint32_t seconds); // Update parameter name in declaration
 
     // NeoPixel control functions
     void setNeoPixel(uint32_t color);

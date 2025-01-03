@@ -9,8 +9,8 @@
 // Move constants outside the class
 enum
 {
-    MOTION_FLAG, // Your existing motion flag location
-    PROG_START   // Program start address
+    PIR_COUNT, // RTC memory location for motion counter
+    PROG_START // Program start address
 };
 
 // ESP32-S3 specific GPIO mappings
@@ -22,8 +22,8 @@ public:
     ULPManager();
     void start(); // Initialize and start the ULP program
     void stop();  // Stop the ULP program
-    bool getEventFlag();
-    void clearEventFlag();
+    uint16_t getPIRCount();
+    void clearPIRCount();
 
 private:
     bool _initialized;

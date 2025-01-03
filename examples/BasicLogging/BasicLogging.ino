@@ -1,26 +1,23 @@
-#define DEBUG_SERIAL 0 // Set to 1 to enable debug delays
+#define DEBUG_SERIAL 0  // Set to 1 to enable debug delays
 
 #include <HublinkBEAM.h>
 
 HublinkBEAM beam;
-const unsigned long LOG_INTERVAL = 10000; // Log every 5 seconds
+const unsigned long LOG_INTERVAL = 60*10;  // Log every seconds
 
-void setup()
-{
+void setup() {
   Serial.begin(115200);
 #if DEBUG_SERIAL
   delay(1000);
 #endif
 
   // Wait for the beam to initialize, retry (likely due to SD card ejecting)
-  while (!beam.begin())
-  {
-    delay(1000); // Wait 1 second before retrying
+  while (!beam.begin()) {
+    delay(1000);  // Wait 1 second before retrying
   }
 }
 
-void loop()
-{
+void loop() {
 #if DEBUG_SERIAL
   delay(500);
 #endif
