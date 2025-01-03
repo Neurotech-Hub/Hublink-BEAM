@@ -12,10 +12,10 @@ void setup()
   delay(1000);
 #endif
 
-  if (!beam.begin())
+  // Wait for the beam to initialize, retry (likely due to SD card ejecting)
+  while (!beam.begin())
   {
-    while (1)
-      delay(1000); // Halt if initialization failed
+    delay(1000); // Wait 1 second before retrying
   }
 }
 
