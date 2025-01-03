@@ -18,7 +18,7 @@
 #define PIN_SD_CS 12    // SD card chip select
 #define PIN_SD_DET 11   // SD card detection pin
 #define PIN_GREEN_LED 5 // On-board green LED
-#define NEOPIXEL_DIM 4
+#define NEOPIXEL_DIM 3
 
 // NeoPixel Colors
 #define NEOPIXEL_OFF 0x000000
