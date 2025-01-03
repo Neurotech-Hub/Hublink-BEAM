@@ -230,6 +230,7 @@ bool HublinkBEAM::initSD()
         Serial.println("SD card initialization failed!");
         return false;
     }
+    SD.exists("/x.txt"); // trick to enter SD idle state
 
     _isSDInitialized = true;
     return true;
