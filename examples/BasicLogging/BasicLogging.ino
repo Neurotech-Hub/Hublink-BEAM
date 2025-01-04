@@ -1,28 +1,24 @@
-#define DEBUG_SERIAL 0  // Set to 1 to enable debug delays
-
 #include <HublinkBEAM.h>
 
 HublinkBEAM beam;
-const unsigned long LOG_INTERVAL = 60*10;  // Log every seconds
+const unsigned long LOG_INTERVAL = 10;//60 * 10; // Log every seconds
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
-#if DEBUG_SERIAL
-  delay(1000);
-#endif
+  delay(1000); // !!serial
 
   // Wait for the beam to initialize, retry (likely due to SD card ejecting)
-  while (!beam.begin()) {
-    delay(1000);  // Wait 1 second before retrying
+  while (!beam.begin())
+  {
+    delay(1000); // Wait 1 second before retrying
   }
 }
 
-void loop() {
-#if DEBUG_SERIAL
-  delay(500);
-#endif
-
+void loop()
+{
   beam.logData();
+  delay(1000); // !!serial
 
   /*
    * Motion logging requires calling sleep() to enable the ULP coprocessor monitoring.

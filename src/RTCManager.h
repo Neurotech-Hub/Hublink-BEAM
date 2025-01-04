@@ -4,8 +4,8 @@
 #include <Arduino.h>
 #include <RTClib.h>
 #include <Preferences.h>
+#include "SharedDefs.h"
 
-#define PREFS_NAMESPACE "beam"
 #define UPLOAD_DELAY_SECONDS 30 // Compensation for delay between compilation and upload
 
 class RTCManager

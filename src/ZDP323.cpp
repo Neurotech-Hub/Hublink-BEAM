@@ -12,16 +12,18 @@ ZDP323::ZDP323(uint8_t i2cAddress)
 
 bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
 {
+    Serial.println("  ZDP323: begin");
     _wire = &wirePort;
     _wire->setTimeout(3000);
 
     // If waking from sleep, we need to disable trigger mode first
     if (isWakeFromSleep)
     {
+        Serial.println("  ZDP323: disabling trigger mode");
         _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
         if (!writeConfig())
         {
-            Serial.println("***Failed to disable trigger mode***");
+            Serial.println("  ZDP323: failed to disable trigger mode");
             return false;
         }
         _initialized = true;
@@ -32,6 +34,7 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
     delay(500); // Only delay on first power-up
 
     // Initial configuration with maximum threshold and trigger mode disabled
+    Serial.println("  ZDP323: initial config");
     _config.detlvl = 0xFF;
     _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
     _config.fstep = ZDP323_CONFIG_FSTEP_2;
@@ -50,7 +53,7 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
             configFailures++;
             if (configFailures >= maxConfigFailures)
             {
-                Serial.printf("***Config write failed (%d/%d)***\n", configFailures, maxConfigFailures);
+                Serial.printf("  ZDP323: config write failed (%d/%d)\n", configFailures, maxConfigFailures);
                 return false;
             }
             delay(100);
@@ -70,6 +73,7 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
 
         if (abs(peakHold) < halfThreshold)
         {
+            Serial.println("  ZDP323: stability achieved");
             break; // Stability achieved
         }
 
@@ -79,19 +83,21 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
 
     if (attempts >= maxAttempts)
     {
-        Serial.println("***Failed to achieve stability***");
+        Serial.println("  ZDP323: failed to achieve stability");
         return false;
     }
 
     // Write final configuration with desired threshold (trigger mode still disabled)
+    Serial.println("  ZDP323: writing final config");
     _config.detlvl = ZDP323_CONFIG_DETLVL_DEFAULT;
     if (!writeConfig())
     {
-        Serial.println("***Final config write failed***");
+        Serial.println("  ZDP323: final config write failed");
         return false;
     }
 
     _initialized = true;
+    Serial.println("  ZDP323: initialization complete");
     return true;
 }
 

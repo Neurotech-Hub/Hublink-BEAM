@@ -12,13 +12,22 @@
 #include "RTCManager.h"
 #include "ULPManager.h"
 #include <Adafruit_NeoPixel.h>
-#include "esp_sleep.h"`
+#include "esp_sleep.h"
+#include <Preferences.h>
+#include "SharedDefs.h"
+
+// Forward declarations
+class DateTime;
 
 // Pin Definitions
 #define PIN_SD_CS 12    // SD card chip select
 #define PIN_SD_DET 11   // SD card detection pin
 #define PIN_GREEN_LED 5 // On-board green LED
 #define NEOPIXEL_DIM 3
+
+// Debugging
+#define BOOT_GPIO 0
+#define DEBUG_DELAY_MS 1000
 
 // NeoPixel Colors
 #define NEOPIXEL_OFF 0x000000
@@ -30,6 +39,9 @@
 // Environmental constants
 #define SEALEVELPRESSURE_HPA (1013.25)
 
+// Rules
+#define LOW_BATTERY_THRESHOLD 3.4
+
 // CSV Header
 #define CSV_HEADER "datetime,millis,battery_voltage,temperature_c,pressure_hpa,humidity_percent,lux,pir_count"
 
@@ -39,8 +51,8 @@ public:
     HublinkBEAM();
     bool begin();
     bool initSD();
-    bool logData(const char *filename = nullptr);
-    void sleep(uint32_t seconds); // Update parameter name in declaration
+    bool logData();
+    void sleep(uint32_t seconds);
 
     // NeoPixel control functions
     void setNeoPixel(uint32_t color);
@@ -84,7 +96,10 @@ private:
     bool createFile(String filename); // Creates new file with header
     bool isSDCardPresent();           // Checks if SD card is inserted
     bool isWakeFromDeepSleep();       // Check if we're waking from deep sleep
+    bool doDebug();                   // Check if debug mode is enabled via BOOT_GPIO
 
+    bool _isLowBattery;
+    bool _isWakeFromSleep; // Track wake state
     File _dataFile;
     bool _isSDInitialized;
     ZDP323 _pirSensor;
@@ -99,6 +114,7 @@ private:
     bool _isRTCInitialized;
     Adafruit_NeoPixel _pixel;
     ULPManager _ulp;
+    Preferences _preferences;
 };
 
 #endif

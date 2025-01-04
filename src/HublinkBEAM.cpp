@@ -1,4 +1,5 @@
 #include "HublinkBEAM.h"
+#include "RTCManager.h"
 #include "esp_sleep.h"
 
 // Use RTC memory to maintain state across deep sleep
@@ -12,6 +13,8 @@ HublinkBEAM::HublinkBEAM() : _pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800)
     _isEnvSensorInitialized = false;
     _isLightSensorInitialized = false;
     _isRTCInitialized = false;
+    _isLowBattery = false;
+    _isWakeFromSleep = false;
 }
 
 bool HublinkBEAM::isWakeFromDeepSleep()
@@ -49,46 +52,50 @@ void HublinkBEAM::initPins()
 bool HublinkBEAM::initSensors(bool isWakeFromSleep)
 {
     bool allInitialized = true;
+    Serial.println("Initializing sensors...");
 
     if (isWakeFromSleep)
     {
+        Serial.println("  ULP: stopping");
         _ulp.stop();
         delay(10); // Give pins time to stabilize
     }
     else
     {
+        Serial.println("  ULP: clearing PIR count");
         _ulp.clearPIRCount(); // could be garbage at startup
     }
 
     Wire.begin();
     delay(100); // Give I2C time to stabilize
-
-    // Initialize PIR sensor with optimized init for wake from sleep
-    if (!_pirSensor.begin(Wire, isWakeFromSleep))
-    {
-        allInitialized = false;
-    }
-    else
-    {
-        if (!isWakeFromSleep)
-        {
-            // Wait for PIR sensor stabilization period
-            esp_sleep_enable_timer_wakeup(ZDP323_TSTAB_MS * 1000); // Convert ms to microseconds
-            esp_light_sleep_start();
-        }
-        _isPIRInitialized = true;
-    }
+    Serial.println("  I2C: started");
 
     // Always initialize I2C devices, but with optimized init for wake from sleep
     // Initialize battery monitor
     if (!_batteryMonitor.begin(&Wire))
     {
+        Serial.println("  Battery: failed");
         allInitialized = false;
         _isBatteryMonitorInitialized = false;
     }
     else
     {
+        Serial.println("  Battery: OK");
         _isBatteryMonitorInitialized = true;
+
+        // Check battery level on initial boot
+        if (!isWakeFromSleep && _isBatteryMonitorInitialized)
+        {
+            float voltage = _batteryMonitor.cellVoltage();
+            Serial.printf("  Battery voltage: %.2fV\n", voltage);
+            if (voltage < LOW_BATTERY_THRESHOLD)
+            {
+                Serial.printf("  Low battery detected: %.2fV\n", voltage);
+                _isLowBattery = true;
+                return false;
+            }
+        }
+
         if (isWakeFromSleep)
         {
             _batteryMonitor.sleep(false); // Wake from sleep mode
@@ -98,11 +105,13 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
     // Initialize environmental sensor
     if (!_envSensor.begin())
     {
+        Serial.println("  BME280: failed");
         allInitialized = false;
         _isEnvSensorInitialized = false;
     }
     else
     {
+        Serial.println("  BME280: OK");
         // Configure BME280 for forced mode with 1x oversampling
         _envSensor.setSampling(Adafruit_BME280::MODE_FORCED,
                                Adafruit_BME280::SAMPLING_X1, // temperature
@@ -115,26 +124,64 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
     // Initialize light sensor
     if (!_lightSensor.begin())
     {
+        Serial.println("  VEM7700: failed");
         allInitialized = false;
         _isLightSensorInitialized = false;
     }
     else
     {
+        Serial.println("  VEM7700: OK");
         _isLightSensorInitialized = true;
     }
 
     // Initialize RTC
     if (!_rtc.begin())
     {
+        Serial.println("  RTC: failed");
         allInitialized = false;
         _isRTCInitialized = false;
     }
     else
     {
+        Serial.println("  RTC: OK");
         _isRTCInitialized = true;
     }
 
+    // Initialize PIR sensor with optimized init for wake from sleep
+    if (!_pirSensor.begin(Wire, isWakeFromSleep))
+    {
+        Serial.println("  PIR: failed");
+        allInitialized = false;
+    }
+    else
+    {
+        Serial.println("  PIR: OK");
+        if (!isWakeFromSleep)
+        {
+            Serial.println("  PIR: starting stabilization");
+            // Use regular delay when USB is connected, light sleep otherwise
+            if (Serial)
+            {
+                delay(ZDP323_TSTAB_MS);
+            }
+            else
+            {
+                esp_sleep_enable_timer_wakeup(ZDP323_TSTAB_MS * 1000); // Convert ms to microseconds
+                esp_light_sleep_start();
+                esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
+            }
+        }
+        _isPIRInitialized = true;
+    }
+
+    Serial.printf("  All sensors %s\n", allInitialized ? "OK" : "FAILED");
     return allInitialized;
+}
+
+bool HublinkBEAM::doDebug()
+{
+    pinMode(BOOT_GPIO, INPUT_PULLUP);
+    return (digitalRead(BOOT_GPIO) == LOW);
 }
 
 bool HublinkBEAM::begin()
@@ -151,8 +198,8 @@ bool HublinkBEAM::begin()
     setNeoPixel(NEOPIXEL_BLUE);
 
     // Check if this is a wake from deep sleep
-    bool isWakeFromSleep = isWakeFromDeepSleep();
-    Serial.printf("    Wake from sleep: %s\n", isWakeFromSleep ? "YES" : "NO");
+    _isWakeFromSleep = isWakeFromDeepSleep();
+    Serial.printf("    Wake from sleep: %s\n", _isWakeFromSleep ? "YES" : "NO");
 
     // Always reinitialize SD card after deep sleep
     if (!initSD())
@@ -161,13 +208,13 @@ bool HublinkBEAM::begin()
     }
 
     // Initialize sensors (with optimization if waking from sleep), skip if SD card failed
-    if (!initSensors(isWakeFromSleep) && allInitialized)
+    if (!initSensors(_isWakeFromSleep) && allInitialized)
     {
         allInitialized = false;
     }
 
     // Only print full initialization report on first boot
-    if (!isWakeFromSleep)
+    if (!_isWakeFromSleep)
     {
         Serial.println("\nHublink BEAM Initialization Report:");
         Serial.println("--------------------------------");
@@ -195,11 +242,25 @@ bool HublinkBEAM::begin()
     }
     else
     {
-        setNeoPixel(NEOPIXEL_RED); // Red if there were any failures
+        if (_isLowBattery)
+        {
+            setNeoPixel(NEOPIXEL_PURPLE); // Purple for low battery
+        }
+        else
+        {
+            setNeoPixel(NEOPIXEL_RED); // Red for other failures
+        }
     }
 
     Serial.flush();
     firstBoot = false;
+
+    // Add debug delay if enabled
+    if (doDebug())
+    {
+        delay(DEBUG_DELAY_MS);
+    }
+
     return allInitialized;
 }
 
@@ -244,9 +305,55 @@ bool HublinkBEAM::isSDCardPresent()
 String HublinkBEAM::getCurrentFilename()
 {
     DateTime now = getDateTime();
-    char filename[14];
-    snprintf(filename, sizeof(filename), "/%04d%02d%02d.csv",
-             now.year(), now.month(), now.day());
+    Serial.println("\nGetting current filename...");
+    Serial.printf("  Wake from sleep: %s\n", _isWakeFromSleep ? "YES" : "NO");
+
+    // If waking from sleep, retrieve the stored filename
+    if (_isWakeFromSleep)
+    {
+        _preferences.begin(PREFS_NAMESPACE, false); // read-only mode
+        String storedFilename = _preferences.getString("filename", "");
+        _preferences.end();
+        Serial.printf("  Retrieved from preferences: %s\n", storedFilename.c_str());
+        return storedFilename;
+    }
+
+    // Hard reboot: create new filename with incremented number
+    char baseFilename[7]; // YYMMDD (6 chars + null terminator)
+    snprintf(baseFilename, sizeof(baseFilename), "%02d%02d%02d",
+             now.year() % 100, now.month(), now.day());
+    Serial.printf("  Base filename: %s\n", baseFilename);
+
+    // Scan files to find the highest existing number for today
+    uint8_t nextNum = 0;
+    char testFilename[14]; // /YYMMDDXX.csv (13 chars + null terminator)
+
+    Serial.println("  Scanning for existing files:");
+    // Test each possible number (00-99)
+    while (nextNum < 100)
+    {
+        snprintf(testFilename, sizeof(testFilename), "/%s%02d.csv", baseFilename, nextNum);
+        Serial.printf("    Testing: %s - ", testFilename);
+        if (!SD.exists(testFilename))
+        {
+            Serial.println("available");
+            break;
+        }
+        Serial.println("exists");
+        nextNum++;
+    }
+
+    // Create final filename with the next available number
+    char filename[14]; // /YYMMDDXX.csv (13 chars + null terminator)
+    snprintf(filename, sizeof(filename), "/%s%02d.csv", baseFilename, nextNum);
+    Serial.printf("  New filename: %s\n", filename);
+
+    // Store the new filename in preferences immediately
+    _preferences.begin(PREFS_NAMESPACE, false); // read-write mode
+    _preferences.putString("filename", String(filename));
+    _preferences.end();
+    Serial.println("  Stored in preferences");
+
     return String(filename);
 }
 
@@ -278,7 +385,7 @@ bool HublinkBEAM::createFile(String filename)
     return false;
 }
 
-bool HublinkBEAM::logData(const char *filename)
+bool HublinkBEAM::logData()
 {
     uint16_t motionCount = _ulp.getPIRCount();
     _ulp.clearPIRCount(); // Reset counter after reading
@@ -298,13 +405,7 @@ bool HublinkBEAM::logData(const char *filename)
         return false;
     }
 
-    String currentFile = filename ? String(filename) : getCurrentFilename();
-
-    // Ensure filename starts with a forward slash
-    if (!currentFile.startsWith("/"))
-    {
-        currentFile = "/" + currentFile;
-    }
+    String currentFile = getCurrentFilename();
 
     // Check if file exists, create it with header if it doesn't
     if (!SD.exists(currentFile))
@@ -316,6 +417,7 @@ bool HublinkBEAM::logData(const char *filename)
             return false;
         }
     }
+
     // Open file in append mode
     File dataFile = SD.open(currentFile, FILE_APPEND);
     if (!dataFile)
@@ -376,6 +478,12 @@ bool HublinkBEAM::logData(const char *filename)
     }
     Serial.flush();
 
+    // Add debug delay if enabled
+    if (doDebug())
+    {
+        delay(DEBUG_DELAY_MS);
+    }
+
     return success;
 }
 
@@ -406,7 +514,7 @@ void HublinkBEAM::sleep(uint32_t seconds)
     _ulp.start();
 
     // Configure deep sleep wakeup sources
-    esp_sleep_enable_timer_wakeup(microseconds); // Convert to microseconds
+    esp_sleep_enable_timer_wakeup(microseconds);
     esp_deep_sleep_start();
     // Note: Device will restart after deep sleep, returning to setup()
 }
