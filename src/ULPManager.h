@@ -20,6 +20,7 @@ class ULPManager
 {
 public:
     ULPManager();
+    void begin();
     void start(); // Initialize and start the ULP program
     void stop();  // Stop the ULP program
     uint16_t getPIRCount();

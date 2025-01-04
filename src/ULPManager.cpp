@@ -38,7 +38,7 @@ ULPManager::ULPManager()
     _initialized = false;
 }
 
-void ULPManager::start()
+void ULPManager::begin()
 {
     // Clear RTC memory
     memset(RTC_SLOW_MEM, 0, CONFIG_ULP_COPROC_RESERVE_MEM);
@@ -65,15 +65,17 @@ void ULPManager::start()
         Serial.printf("***ULP program load error: %d***\n", err);
         return;
     }
+    _initialized = true;
+}
 
-    err = ulp_run(PROG_START);
+void ULPManager::start()
+{
+    esp_err_t err = ulp_run(PROG_START);
     if (err != ESP_OK)
     {
         Serial.printf("***Error starting ULP program: %d***\n", err);
         return;
     }
-
-    _initialized = true;
 }
 
 void ULPManager::stop()

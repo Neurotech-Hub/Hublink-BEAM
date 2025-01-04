@@ -511,6 +511,7 @@ void HublinkBEAM::sleep(uint32_t seconds)
     Serial.println("\n\nENTERING DEEP SLEEP\n\n");
     Serial.flush();
 
+    _ulp.begin();
     _ulp.start();
 
     // Configure deep sleep wakeup sources
