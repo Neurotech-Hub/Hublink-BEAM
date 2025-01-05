@@ -4,6 +4,7 @@
 
 // Use RTC memory to maintain state across deep sleep
 static RTC_DATA_ATTR bool firstBoot = true;
+RTC_DATA_ATTR sleep_config_t sleep_config;
 
 HublinkBEAM::HublinkBEAM() : _pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800)
 {
@@ -53,22 +54,6 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
 {
     bool allInitialized = true;
     Serial.println("Initializing sensors...");
-
-    if (isWakeFromSleep)
-    {
-        Serial.println("  ULP: stopping");
-        _ulp.stop();
-        delay(10); // Give pins time to stabilize
-    }
-    else
-    {
-        Serial.println("  ULP: clearing PIR count");
-        _ulp.clearPIRCount(); // could be garbage at startup
-    }
-
-    Wire.begin();
-    delay(100); // Give I2C time to stabilize
-    Serial.println("  I2C: started");
 
     // Always initialize I2C devices, but with optimized init for wake from sleep
     // Initialize battery monitor
@@ -186,20 +171,103 @@ bool HublinkBEAM::doDebug()
 
 bool HublinkBEAM::begin()
 {
-    bool allInitialized = true;
-
     // Set CPU frequency to 80MHz
     setCpuFrequencyMhz(80);
 
-    Serial.println("Initializing BEAM...");
+    // Stop ULP to free up GPIO pins
+    _ulp.stop();
+    delay(10);
 
     // Initialize pins and set NeoPixel to blue during initialization
     initPins();
     setNeoPixel(NEOPIXEL_BLUE);
 
+    // Initialize I2C for all cases
+    Wire.begin();
+    delay(10); // Give I2C time to stabilize
+    Serial.println("  I2C: started");
+
+    // Check wakeup reason immediately
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+
+    // If we're in stage 1 (GPIO monitoring) and got a GPIO wakeup
+    if (sleep_config.sleep_stage == SLEEP_STAGE_GPIO_MONITOR &&
+        wakeup_reason == ESP_SLEEP_WAKEUP_EXT0)
+    {
+        // Quick initialization of RTC for time calculations
+        if (!_rtc.begin())
+        {
+            Serial.println("  Error: Failed to initialize RTC for time calculation");
+            return false;
+        }
+        _isRTCInitialized = true;
+
+        // Increment PIR count for the GPIO interrupt we just received
+        RTC_SLOW_MEM[PIR_COUNT]++;
+
+        // Calculate remaining sleep time
+        int32_t current_time = getUnixTime();
+        int32_t start_time = sleep_config.sleep_start_time;
+        int32_t elapsed_time = 0;
+
+        Serial.printf("  Debug - Current time: %d, Start time: %d\n", current_time, start_time);
+
+        // Ensure times are valid and calculate elapsed time
+        if (current_time >= start_time)
+        {
+            elapsed_time = current_time - start_time;
+        }
+        else
+        {
+            Serial.println("  Warning: Time calculation error, using full duration");
+            elapsed_time = 0;
+        }
+
+        uint32_t remaining_time = sleep_config.sleep_duration;
+        if (elapsed_time < sleep_config.sleep_duration)
+        {
+            remaining_time = sleep_config.sleep_duration - elapsed_time;
+        }
+
+        Serial.println("\nMotion detected during Stage 1");
+        Serial.printf("  Current time: %d\n", current_time);
+        Serial.printf("  Start time: %d\n", start_time);
+        Serial.printf("  Elapsed time: %d seconds\n", elapsed_time);
+        Serial.printf("  Remaining time: %d seconds\n", remaining_time);
+
+        // Move to stage 2: ULP monitoring
+        sleep_config.sleep_stage = SLEEP_STAGE_ULP_MONITOR;
+        sleep_config.sleep_start_time = current_time;
+        sleep_config.sleep_duration = remaining_time; // Update duration to remaining time
+
+        // Start the ULP program (already initialized in sleep())
+        _ulp.start();
+
+        Serial.println("Entering Stage 2 Deep Sleep (ULP monitoring)");
+        Serial.flush();
+
+        // Configure timer wakeup for remaining time
+        uint64_t remaining_microseconds = (uint64_t)remaining_time * 1000000ULL;
+        esp_sleep_enable_timer_wakeup(remaining_microseconds);
+
+        esp_deep_sleep_start();
+        return false; // Never reached
+    }
+
+    // Normal initialization for timer wakeup or regular boot
+    Serial.println("Initializing BEAM...");
+
+    bool allInitialized = true;
+
     // Check if this is a wake from deep sleep
-    _isWakeFromSleep = isWakeFromDeepSleep();
+    _isWakeFromSleep = (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER);
     Serial.printf("    Wake from sleep: %s\n", _isWakeFromSleep ? "YES" : "NO");
+
+    // Reset sleep stage on normal boot or timer wakeup
+    if (!_isWakeFromSleep || wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
+    {
+        sleep_config.sleep_stage = SLEEP_STAGE_NORMAL;
+    }
 
     // Always reinitialize SD card after deep sleep
     if (!initSD())
@@ -489,35 +557,66 @@ bool HublinkBEAM::logData()
 
 void HublinkBEAM::sleep(uint32_t seconds)
 {
-    // Convert seconds to microseconds (1 second = 1,000,000 microseconds)
-    uint64_t microseconds = seconds * 1000000ULL;
     disableNeoPixel();
     digitalWrite(LED_BUILTIN, LOW);
     digitalWrite(PIN_GREEN_LED, LOW);
 
-    // Enable trigger mode for PIR sensor before sleep
+    // Prepare sensors for sleep (needed for both stages)
     if (_isPIRInitialized)
     {
         _pirSensor.enableTriggerMode();
     }
 
-    // Put battery monitor into sleep mode before deep sleep
     if (_isBatteryMonitorInitialized)
     {
         _batteryMonitor.enableSleep(true); // Enable sleep capability
         _batteryMonitor.sleep(true);       // Enter sleep mode
     }
 
-    Serial.println("\n\nENTERING DEEP SLEEP\n\n");
+    // Only initialize sleep configuration if we're not already in a sleep cycle
+    if (sleep_config.sleep_stage == SLEEP_STAGE_NORMAL)
+    {
+        // Clear any existing PIR counts before starting new cycle
+        _ulp.clearPIRCount();
+
+        sleep_config.sleep_duration = seconds;
+        sleep_config.sleep_start_time = getUnixTime();
+        sleep_config.sleep_stage = SLEEP_STAGE_GPIO_MONITOR;
+
+        Serial.println("\nPreparing for Stage 1 Deep Sleep (GPIO monitoring)");
+        Serial.printf("  Duration: %d seconds\n", seconds);
+        Serial.printf("  Start time: %d\n", sleep_config.sleep_start_time);
+
+        // Initialize ULP program (but don't start it yet)
+        _ulp.begin();
+    }
+    else
+    {
+        Serial.println("\nContinuing existing sleep cycle");
+        Serial.printf("  Stage: %d\n", sleep_config.sleep_stage);
+        Serial.printf("  Original start time: %d\n", sleep_config.sleep_start_time);
+    }
+
+    Serial.println("Entering Deep Sleep");
     Serial.flush();
 
-    _ulp.begin();
-    _ulp.start();
+    // Configure GPIO wakeup on SDA_GPIO (LOW)
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)SDA_GPIO, 0);
 
-    // Configure deep sleep wakeup sources
+    // Calculate remaining time based on original start time
+    uint32_t current_time = getUnixTime();
+    uint32_t elapsed = current_time - sleep_config.sleep_start_time;
+    uint32_t remaining = sleep_config.sleep_duration;
+    if (elapsed < sleep_config.sleep_duration)
+    {
+        remaining = sleep_config.sleep_duration - elapsed;
+    }
+
+    // Enable timer wakeup for the remaining duration
+    uint64_t microseconds = (uint64_t)remaining * 1000000ULL;
     esp_sleep_enable_timer_wakeup(microseconds);
+
     esp_deep_sleep_start();
-    // Note: Device will restart after deep sleep, returning to setup()
 }
 
 float HublinkBEAM::getBatteryVoltage()

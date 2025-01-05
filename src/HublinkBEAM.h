@@ -19,6 +19,9 @@
 // Forward declarations
 class DateTime;
 
+// External declarations for RTC memory
+extern sleep_config_t sleep_config;
+
 // Pin Definitions
 #define PIN_SD_CS 12    // SD card chip select
 #define PIN_SD_DET 11   // SD card detection pin
