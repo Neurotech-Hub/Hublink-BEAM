@@ -245,6 +245,7 @@ bool HublinkBEAM::begin()
 
         Serial.println("Entering Stage 2 Deep Sleep (ULP monitoring)");
         Serial.flush();
+        disableNeoPixel();
 
         // Configure timer wakeup for remaining time
         uint64_t remaining_microseconds = (uint64_t)remaining_time * 1000000ULL;
@@ -284,6 +285,9 @@ bool HublinkBEAM::begin()
     // Only print full initialization report on first boot
     if (!_isWakeFromSleep)
     {
+        // Clear any stale PIR counts on first boot
+        _ulp.clearPIRCount();
+
         Serial.println("\nHublink BEAM Initialization Report:");
         Serial.println("--------------------------------");
         Serial.printf("PIR Sensor: %s\n", _isPIRInitialized ? "OK" : "FAILED");
@@ -376,17 +380,43 @@ String HublinkBEAM::getCurrentFilename()
     Serial.println("\nGetting current filename...");
     Serial.printf("  Wake from sleep: %s\n", _isWakeFromSleep ? "YES" : "NO");
 
-    // If waking from sleep, retrieve the stored filename
-    if (_isWakeFromSleep)
+    // If waking from sleep or newFileOnBoot is false, try to retrieve stored filename
+    if (_isWakeFromSleep || !newFileOnBoot)
     {
         _preferences.begin(PREFS_NAMESPACE, false); // read-only mode
         String storedFilename = _preferences.getString("filename", "");
         _preferences.end();
-        Serial.printf("  Retrieved from preferences: %s\n", storedFilename.c_str());
-        return storedFilename;
+
+        // If we have a stored filename, check if it exists and is from today
+        if (storedFilename.length() > 0)
+        {
+            // Extract date from stored filename (format: /YYMMDDXX.csv)
+            int storedYear = (storedFilename.substring(1, 3).toInt()) + 2000;
+            int storedMonth = storedFilename.substring(3, 5).toInt();
+            int storedDay = storedFilename.substring(5, 7).toInt();
+
+            // Check if stored file is from today and exists
+            if (storedYear == now.year() &&
+                storedMonth == now.month() &&
+                storedDay == now.day() &&
+                SD.exists(storedFilename))
+            {
+                Serial.printf("  Using existing file: %s\n", storedFilename.c_str());
+                return storedFilename;
+            }
+
+            if (!SD.exists(storedFilename))
+            {
+                Serial.println("  Stored file not found on SD card, creating new file");
+            }
+            else
+            {
+                Serial.println("  Stored file is from a different day, creating new file");
+            }
+        }
     }
 
-    // Hard reboot: create new filename with incremented number
+    // Create new filename with incremented number
     char baseFilename[7]; // YYMMDD (6 chars + null terminator)
     snprintf(baseFilename, sizeof(baseFilename), "%02d%02d%02d",
              now.year() % 100, now.month(), now.day());
@@ -517,7 +547,7 @@ bool HublinkBEAM::logData()
     // Format data string
     char dataString[128];
     snprintf(dataString, sizeof(dataString),
-             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%.3f,%.2f,%.2f,%.2f,%.2f,%d",
+             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%.3f,%.2f,%.2f,%.2f,%.2f,%d,%d",
              now.year(), now.month(), now.day(),
              now.hour(), now.minute(), now.second(),
              millis(),
@@ -526,7 +556,8 @@ bool HublinkBEAM::logData()
              pressHpa,
              humidity,
              lux,
-             motionCount);
+             motionCount,
+             !_isWakeFromSleep); // 1 for fresh boot, 0 for wake from sleep
 
     // Write data
     bool success = dataFile.println(dataString);

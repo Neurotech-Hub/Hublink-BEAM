@@ -46,7 +46,7 @@ extern sleep_config_t sleep_config;
 #define LOW_BATTERY_THRESHOLD 3.4
 
 // CSV Header
-#define CSV_HEADER "datetime,millis,battery_voltage,temperature_c,pressure_hpa,humidity_percent,lux,pir_count"
+#define CSV_HEADER "datetime,millis,battery_voltage,temperature_c,pressure_hpa,humidity_percent,lux,pir_count,reboot"
 
 class HublinkBEAM
 {
@@ -56,6 +56,9 @@ public:
     bool initSD();
     bool logData();
     void sleep(uint32_t seconds);
+
+    // File creation behavior
+    bool newFileOnBoot = true; // Controls whether to create new file on each boot
 
     // NeoPixel control functions
     void setNeoPixel(uint32_t color);

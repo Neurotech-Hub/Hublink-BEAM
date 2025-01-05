@@ -8,6 +8,41 @@ An Arduino library for the Hublink BEAM ESP32-S3 data logging device. This libra
 2. In the Arduino IDE, go to Sketch -> Include Library -> Add .ZIP Library
 3. Select the downloaded repository
 
+## Data Logging
+
+### CSV Format
+Each log entry contains the following columns:
+- `datetime`: Current date and time (YYYY-MM-DD HH:MM:SS)
+- `millis`: Milliseconds since last boot
+- `battery_voltage`: Battery voltage in volts (-1.0 if sensor failed)
+- `temperature_c`: Temperature in Celsius (-273.15 if sensor failed)
+- `pressure_hpa`: Atmospheric pressure in hPa (-1.0 if sensor failed)
+- `humidity_percent`: Relative humidity percentage (-1.0 if sensor failed)
+- `lux`: Light level in lux (-1.0 if sensor failed)
+- `pir_count`: Number of motion events since last log
+- `reboot`: 1 if entry is from fresh boot, 0 if from wake from sleep
+
+### File Creation Behavior
+Files are named in the format `YYMMDDXX.csv` where:
+- `YY`: Last two digits of year
+- `MM`: Month (01-12)
+- `DD`: Day (01-31)
+- `XX`: Sequence number (00-99)
+
+The sequence number handling can be controlled with the `newFileOnBoot` setting:
+```cpp
+beam.newFileOnBoot = false; // Continue using same file if it's the same day
+```
+
+- When `true` (default): Creates a new file with incremented sequence number on each boot
+- When `false`: Continues using the same file if it's from the same day
+
+If the SD card is cleared or files are deleted:
+1. The system scans for existing files matching today's date
+2. Uses the next available sequence number (00-99)
+3. Creates a new file regardless of any stored filename in preferences
+4. This ensures proper sequencing even after data is wiped
+
 ## Startup Sequence
 
 On power-up or reset, the device:
