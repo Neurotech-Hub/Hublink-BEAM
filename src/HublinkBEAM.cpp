@@ -268,6 +268,12 @@ bool HublinkBEAM::begin()
     if (!_isWakeFromSleep || wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
     {
         sleep_config.sleep_stage = SLEEP_STAGE_NORMAL;
+        // Reset alarm start time on hard reset only
+        if (!_isWakeFromSleep)
+        {
+            sleep_config.alarm_start_time = 0;
+            sleep_config.alarm_interval = 0;
+        }
     }
 
     // Always reinitialize SD card after deep sleep
@@ -586,8 +592,10 @@ bool HublinkBEAM::logData()
     return success;
 }
 
-void HublinkBEAM::sleep(uint32_t seconds)
+void HublinkBEAM::sleep(uint32_t minutes)
 {
+    uint32_t seconds = minutes * 60; // Convert minutes to seconds
+
     disableNeoPixel();
     digitalWrite(LED_BUILTIN, LOW);
     digitalWrite(PIN_GREEN_LED, LOW);
@@ -610,12 +618,12 @@ void HublinkBEAM::sleep(uint32_t seconds)
         // Clear any existing PIR counts before starting new cycle
         _ulp.clearPIRCount();
 
-        sleep_config.sleep_duration = seconds;
+        sleep_config.sleep_duration = seconds; // Store duration in seconds
         sleep_config.sleep_start_time = getUnixTime();
         sleep_config.sleep_stage = SLEEP_STAGE_GPIO_MONITOR;
 
         Serial.println("\nPreparing for Stage 1 Deep Sleep (GPIO monitoring)");
-        Serial.printf("  Duration: %d seconds\n", seconds);
+        Serial.printf("  Duration: %d minutes (%d seconds)\n", minutes, seconds);
         Serial.printf("  Start time: %d\n", sleep_config.sleep_start_time);
 
         // Initialize ULP program (but don't start it yet)
@@ -823,4 +831,40 @@ DateTime HublinkBEAM::getFutureTime(int days, int hours, int minutes, int second
 bool HublinkBEAM::isRTCConnected()
 {
     return _isRTCInitialized;
+}
+
+void HublinkBEAM::setAlarmForEvery(uint16_t minutes)
+{
+    if (!_isRTCInitialized)
+    {
+        return;
+    }
+
+    sleep_config.alarm_interval = minutes;
+
+    // Only set start time if this is first configuration or after hard reset
+    if (sleep_config.alarm_start_time == 0)
+    {
+        sleep_config.alarm_start_time = getUnixTime();
+    }
+}
+
+bool HublinkBEAM::alarmForEvery()
+{
+    if (!_isRTCInitialized || sleep_config.alarm_interval == 0)
+    {
+        return false;
+    }
+
+    uint32_t current_time = getUnixTime();
+    uint32_t elapsed = current_time - sleep_config.alarm_start_time;
+    uint32_t interval_seconds = (uint32_t)sleep_config.alarm_interval * 60;
+
+    if (elapsed >= interval_seconds)
+    {
+        sleep_config.alarm_start_time = current_time;
+        return true;
+    }
+
+    return false;
 }

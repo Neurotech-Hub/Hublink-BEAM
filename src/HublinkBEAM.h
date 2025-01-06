@@ -55,7 +55,7 @@ public:
     bool begin();
     bool initSD();
     bool logData();
-    void sleep(uint32_t seconds);
+    void sleep(uint32_t minutes);
 
     // File creation behavior
     bool newFileOnBoot = true; // Controls whether to create new file on each boot
@@ -94,6 +94,10 @@ public:
     void adjustRTC(const DateTime &dt);
     DateTime getFutureTime(int days, int hours, int minutes, int seconds);
     bool isRTCConnected();
+
+    // Alarm functions
+    void setAlarmForEvery(uint16_t minutes);
+    bool alarmForEvery();
 
 private:
     void initPins();

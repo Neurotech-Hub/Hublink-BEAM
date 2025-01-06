@@ -23,7 +23,9 @@ typedef struct
 {
     uint32_t sleep_duration;   // Original sleep duration in seconds
     uint32_t sleep_start_time; // When we started sleeping (Unix timestamp)
+    uint32_t alarm_start_time; // When we started counting for alarm (Unix timestamp)
     uint8_t sleep_stage;       // Uses SleepStage enum
+    uint16_t alarm_interval;   // Alarm interval in minutes (0 = disabled)
 } sleep_config_t;
 
 #endif

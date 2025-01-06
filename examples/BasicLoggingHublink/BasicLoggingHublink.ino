@@ -1,9 +1,13 @@
+// #include <Hublink.h>
 #include <HublinkBEAM.h>
 
 #define DO_DEBUG 1 // Set to 1 to enable serial debugging delays
 
 HublinkBEAM beam;
-const unsigned long LOG_EVERY_MINUTES = 5; // Log every X minutes
+// Hublink hublink(PIN_SD_CS);
+const unsigned long LOG_EVERY_MINUTES = 1;     // Log every X minutes
+const unsigned long SYNC_EVERY_MINUTES = 2;    // Sync every X minutes
+const unsigned long SYNC_TIMEOUT_SECONDS = 20; // Sync timeout in seconds
 
 void setup()
 {
@@ -15,11 +19,24 @@ void setup()
   // Configure file creation behavior
   beam.newFileOnBoot = true; // Continue using same file if it's the same day
 
-  // Wait for the beam to initialize, retry on failure (likely due to SD card ejecting)
+  // Wait for the beam to initialize, retry (likely due to SD card ejecting)
   while (!beam.begin())
   {
     delay(1000); // Wait 1 second before retrying
   }
+
+  // Configure alarm after beam initialization
+  beam.setAlarmForEvery(SYNC_EVERY_MINUTES);
+
+  // if (hublink.begin())
+  // {
+  //   Serial.println("✓ Hublink.");
+  // }
+  // else
+  // {
+  //   Serial.println("✗ Failed.");
+  //   // do not block Hublink failure
+  // }
 }
 
 void loop()
@@ -28,6 +45,13 @@ void loop()
 #if DO_DEBUG
   delay(1000); // Wait for serial output
 #endif
+
+  // Check if interval has passed
+  if (beam.alarmForEvery())
+  {
+    Serial.println("Alarm triggered!");
+    // hublink.sync(SYNC_TIMEOUT_SECONDS);
+  }
 
   /*
    * Motion logging requires calling sleep() to enable the ULP coprocessor monitoring.
