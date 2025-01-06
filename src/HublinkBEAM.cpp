@@ -18,161 +18,24 @@ HublinkBEAM::HublinkBEAM() : _pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800)
     _isWakeFromSleep = false;
 }
 
-bool HublinkBEAM::isWakeFromDeepSleep()
-{
-    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-    return wakeup_reason == ESP_SLEEP_WAKEUP_TIMER;
-}
-
-void HublinkBEAM::initPins()
-{
-    pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, LOW);
-
-    // Initialize SD card pins
-    pinMode(PIN_SD_CS, OUTPUT);
-    digitalWrite(PIN_SD_CS, HIGH); // Deselect SD card by default
-    pinMode(PIN_SD_DET, INPUT_PULLUP);
-
-    // Initialize on-board LED
-    pinMode(PIN_GREEN_LED, OUTPUT);
-    digitalWrite(PIN_GREEN_LED, LOW); // Turn off green LED
-
-    // Initialize and hold (during deep sleep) I2C power control
-    pinMode(PIN_I2C_POWER, OUTPUT);
-    digitalWrite(PIN_I2C_POWER, HIGH);
-
-    // Initialize NeoPixel power pin and pixel
-    pinMode(NEOPIXEL_POWER, OUTPUT);
-    digitalWrite(NEOPIXEL_POWER, HIGH);
-    _pixel.begin();
-    _pixel.setBrightness(NEOPIXEL_DIM); // Set to low brightness
-    _pixel.show();                      // Initialize all pixels to 'off'
-}
-
-bool HublinkBEAM::initSensors(bool isWakeFromSleep)
-{
-    bool allInitialized = true;
-    Serial.println("Initializing sensors...");
-
-    // Always initialize I2C devices, but with optimized init for wake from sleep
-    // Initialize battery monitor
-    if (!_batteryMonitor.begin(&Wire))
-    {
-        Serial.println("  Battery: failed");
-        allInitialized = false;
-        _isBatteryMonitorInitialized = false;
-    }
-    else
-    {
-        Serial.println("  Battery: OK");
-        _isBatteryMonitorInitialized = true;
-
-        // Check battery level on initial boot
-        if (!isWakeFromSleep && _isBatteryMonitorInitialized)
-        {
-            float voltage = _batteryMonitor.cellVoltage();
-            Serial.printf("  Battery voltage: %.2fV\n", voltage);
-            if (voltage < LOW_BATTERY_THRESHOLD)
-            {
-                Serial.printf("  Low battery detected: %.2fV\n", voltage);
-                _isLowBattery = true;
-                return false;
-            }
-        }
-
-        if (isWakeFromSleep)
-        {
-            _batteryMonitor.sleep(false); // Wake from sleep mode
-        }
-    }
-
-    // Initialize environmental sensor
-    if (!_envSensor.begin())
-    {
-        Serial.println("  BME280: failed");
-        allInitialized = false;
-        _isEnvSensorInitialized = false;
-    }
-    else
-    {
-        Serial.println("  BME280: OK");
-        // Configure BME280 for forced mode with 1x oversampling
-        _envSensor.setSampling(Adafruit_BME280::MODE_FORCED,
-                               Adafruit_BME280::SAMPLING_X1, // temperature
-                               Adafruit_BME280::SAMPLING_X1, // pressure
-                               Adafruit_BME280::SAMPLING_X1, // humidity
-                               Adafruit_BME280::FILTER_OFF);
-        _isEnvSensorInitialized = true;
-    }
-
-    // Initialize light sensor
-    if (!_lightSensor.begin())
-    {
-        Serial.println("  VEM7700: failed");
-        allInitialized = false;
-        _isLightSensorInitialized = false;
-    }
-    else
-    {
-        Serial.println("  VEM7700: OK");
-        _isLightSensorInitialized = true;
-    }
-
-    // Initialize RTC
-    if (!_rtc.begin())
-    {
-        Serial.println("  RTC: failed");
-        allInitialized = false;
-        _isRTCInitialized = false;
-    }
-    else
-    {
-        Serial.println("  RTC: OK");
-        _isRTCInitialized = true;
-    }
-
-    // Initialize PIR sensor with optimized init for wake from sleep
-    if (!_pirSensor.begin(Wire, isWakeFromSleep))
-    {
-        Serial.println("  PIR: failed");
-        allInitialized = false;
-    }
-    else
-    {
-        Serial.println("  PIR: OK");
-        if (!isWakeFromSleep)
-        {
-            Serial.println("  PIR: starting stabilization");
-            // Use regular delay when USB is connected, light sleep otherwise
-            if (Serial)
-            {
-                delay(ZDP323_TSTAB_MS);
-            }
-            else
-            {
-                esp_sleep_enable_timer_wakeup(ZDP323_TSTAB_MS * 1000); // Convert ms to microseconds
-                esp_light_sleep_start();
-                esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
-            }
-        }
-        _isPIRInitialized = true;
-    }
-
-    Serial.printf("  All sensors %s\n", allInitialized ? "OK" : "FAILED");
-    return allInitialized;
-}
-
-bool HublinkBEAM::doDebug()
-{
-    pinMode(BOOT_GPIO, INPUT_PULLUP);
-    return (digitalRead(BOOT_GPIO) == LOW);
-}
-
 bool HublinkBEAM::begin()
 {
     // Set CPU frequency to 80MHz
     setCpuFrequencyMhz(80);
+
+    // Normal initialization for timer wakeup or regular boot
+    Serial.println("beam.begin()...");
+
+    // Initialize sleep configuration if needed (preserve across retries)
+    if (sleep_config.magic != SLEEP_CONFIG_MAGIC)
+    {
+        Serial.println("Initializing sleep configuration");
+        memset(&sleep_config, 0, sizeof(sleep_config_t));
+        sleep_config.magic = SLEEP_CONFIG_MAGIC;
+        sleep_config.sleep_stage = SLEEP_STAGE_NORMAL;
+        sleep_config.alarm_start_time = 0;
+        sleep_config.alarm_interval = 0;
+    }
 
     // Stop ULP to free up GPIO pins
     _ulp.stop();
@@ -181,9 +44,6 @@ bool HublinkBEAM::begin()
     // Initialize pins and set NeoPixel to blue during initialization
     initPins();
     setNeoPixel(NEOPIXEL_BLUE);
-
-    // Normal initialization for timer wakeup or regular boot
-    Serial.println("beam.begin()...");
 
     // Initialize I2C for all cases
     Wire.begin();
@@ -340,6 +200,170 @@ bool HublinkBEAM::begin()
     }
 
     return allInitialized;
+}
+
+bool HublinkBEAM::isWakeFromDeepSleep()
+{
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    return wakeup_reason == ESP_SLEEP_WAKEUP_TIMER;
+}
+
+void HublinkBEAM::initPins()
+{
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, LOW);
+
+    // Initialize SD card pins
+    pinMode(PIN_SD_CS, OUTPUT);
+    digitalWrite(PIN_SD_CS, HIGH); // Deselect SD card by default
+    pinMode(PIN_SD_DET, INPUT_PULLUP);
+
+    // Initialize on-board LED
+    pinMode(PIN_GREEN_LED, OUTPUT);
+    digitalWrite(PIN_GREEN_LED, LOW); // Turn off green LED
+
+    // Initialize and hold (during deep sleep) I2C power control
+    pinMode(PIN_I2C_POWER, OUTPUT);
+    digitalWrite(PIN_I2C_POWER, HIGH);
+
+    // Initialize NeoPixel power pin and pixel
+    pinMode(NEOPIXEL_POWER, OUTPUT);
+    digitalWrite(NEOPIXEL_POWER, HIGH);
+    _pixel.begin();
+    _pixel.setBrightness(NEOPIXEL_DIM); // Set to low brightness
+    _pixel.show();                      // Initialize all pixels to 'off'
+}
+
+bool HublinkBEAM::initSensors(bool isWakeFromSleep)
+{
+    bool allInitialized = true;
+    Serial.println("Initializing sensors...");
+
+    // Initialize battery monitor with detailed debug
+    if (!_batteryMonitor.begin(&Wire))
+    {
+        Serial.println("  Battery: failed to begin()");
+        allInitialized = false;
+        _isBatteryMonitorInitialized = false;
+    }
+    else
+    {
+        Serial.println("  Battery: begin() OK");
+        _isBatteryMonitorInitialized = true;
+
+        // Replace single delay with retry loop
+        const uint8_t MAX_RETRIES = 10;
+        uint8_t retries = 0;
+        float voltage = 0;
+
+        while (retries < MAX_RETRIES)
+        {
+            delay(10); // Shorter delay between attempts
+            voltage = _batteryMonitor.cellVoltage();
+            Serial.printf("  Battery init - attempt %d: %.2fV\n", retries + 1, voltage);
+
+            if (voltage > 0 && !isnan(voltage))
+            {
+                break; // Valid reading obtained
+            }
+            retries++;
+        }
+
+        // Continue with existing battery check logic
+        float percent = _batteryMonitor.cellPercent();
+        Serial.printf("  Battery debug - Final values:\n");
+        Serial.printf("    Voltage: %.2fV\n", voltage);
+        Serial.printf("    Percent: %.1f%%\n", percent);
+        Serial.printf("    isnan(voltage): %d\n", isnan(voltage));
+
+        if (voltage < LOW_BATTERY_THRESHOLD)
+        {
+            Serial.printf("  Low battery detected: %.2fV\n", voltage);
+            _isLowBattery = true;
+            return false;
+        }
+    }
+
+    // Initialize environmental sensor
+    if (!_envSensor.begin())
+    {
+        Serial.println("  BME280: failed");
+        allInitialized = false;
+        _isEnvSensorInitialized = false;
+    }
+    else
+    {
+        Serial.println("  BME280: OK");
+        // Configure BME280 for forced mode with 1x oversampling
+        _envSensor.setSampling(Adafruit_BME280::MODE_FORCED,
+                               Adafruit_BME280::SAMPLING_X1, // temperature
+                               Adafruit_BME280::SAMPLING_X1, // pressure
+                               Adafruit_BME280::SAMPLING_X1, // humidity
+                               Adafruit_BME280::FILTER_OFF);
+        _isEnvSensorInitialized = true;
+    }
+
+    // Initialize light sensor
+    if (!_lightSensor.begin())
+    {
+        Serial.println("  VEM7700: failed");
+        allInitialized = false;
+        _isLightSensorInitialized = false;
+    }
+    else
+    {
+        Serial.println("  VEM7700: OK");
+        _isLightSensorInitialized = true;
+    }
+
+    // Initialize RTC
+    if (!_rtc.begin())
+    {
+        Serial.println("  RTC: failed");
+        allInitialized = false;
+        _isRTCInitialized = false;
+    }
+    else
+    {
+        Serial.println("  RTC: OK");
+        _isRTCInitialized = true;
+    }
+
+    // Initialize PIR sensor with optimized init for wake from sleep
+    if (!_pirSensor.begin(Wire, isWakeFromSleep))
+    {
+        Serial.println("  PIR: failed");
+        allInitialized = false;
+    }
+    else
+    {
+        Serial.println("  PIR: OK");
+        if (!isWakeFromSleep)
+        {
+            Serial.println("  PIR: starting stabilization");
+            // Use regular delay when USB is connected, light sleep otherwise
+            if (Serial)
+            {
+                delay(ZDP323_TSTAB_MS);
+            }
+            else
+            {
+                esp_sleep_enable_timer_wakeup(ZDP323_TSTAB_MS * 1000); // Convert ms to microseconds
+                esp_light_sleep_start();
+                esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
+            }
+        }
+        _isPIRInitialized = true;
+    }
+
+    Serial.printf("  All sensors %s\n", allInitialized ? "OK" : "FAILED");
+    return allInitialized;
+}
+
+bool HublinkBEAM::doDebug()
+{
+    pinMode(BOOT_GPIO, INPUT_PULLUP);
+    return (digitalRead(BOOT_GPIO) == LOW);
 }
 
 void HublinkBEAM::setNeoPixel(uint32_t color)
@@ -837,6 +861,7 @@ void HublinkBEAM::setAlarmForEvery(uint16_t minutes)
 {
     if (!_isRTCInitialized)
     {
+        Serial.println("setAlarmForEvery: RTC not initialized");
         return;
     }
 
@@ -846,6 +871,13 @@ void HublinkBEAM::setAlarmForEvery(uint16_t minutes)
     if (sleep_config.alarm_start_time == 0)
     {
         sleep_config.alarm_start_time = getUnixTime();
+        Serial.printf("setAlarmForEvery: Initialized alarm - interval: %d minutes, start time: %d\n",
+                      minutes, sleep_config.alarm_start_time);
+    }
+    else
+    {
+        Serial.printf("setAlarmForEvery: Updated interval to %d minutes (keeping existing start time: %d)\n",
+                      minutes, sleep_config.alarm_start_time);
     }
 }
 
@@ -853,6 +885,7 @@ bool HublinkBEAM::alarmForEvery()
 {
     if (!_isRTCInitialized || sleep_config.alarm_interval == 0)
     {
+        Serial.println("alarmForEvery: RTC not initialized or no interval set");
         return false;
     }
 
@@ -860,11 +893,20 @@ bool HublinkBEAM::alarmForEvery()
     uint32_t elapsed = current_time - sleep_config.alarm_start_time;
     uint32_t interval_seconds = (uint32_t)sleep_config.alarm_interval * 60;
 
+    Serial.println("\nChecking alarm condition:");
+    Serial.printf("  Current time: %d\n", current_time);
+    Serial.printf("  Start time: %d\n", sleep_config.alarm_start_time);
+    Serial.printf("  Elapsed time: %d seconds\n", elapsed);
+    Serial.printf("  Interval: %d seconds\n", interval_seconds);
+
     if (elapsed >= interval_seconds)
     {
+        Serial.println("  → Alarm triggered!");
         sleep_config.alarm_start_time = current_time;
         return true;
     }
 
+    Serial.printf("  → Not triggered (need %d more seconds)\n",
+                  interval_seconds - elapsed);
     return false;
 }

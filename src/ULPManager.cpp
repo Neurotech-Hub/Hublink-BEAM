@@ -40,9 +40,6 @@ ULPManager::ULPManager()
 
 void ULPManager::begin()
 {
-    // Clear RTC memory
-    memset(RTC_SLOW_MEM, 0, CONFIG_ULP_COPROC_RESERVE_MEM);
-
     // Configure I2C power pin
     rtc_gpio_init((gpio_num_t)PIN_I2C_POWER);
     rtc_gpio_set_direction((gpio_num_t)PIN_I2C_POWER, RTC_GPIO_MODE_OUTPUT_ONLY);

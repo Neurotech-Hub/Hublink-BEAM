@@ -1,12 +1,12 @@
-// #include <Hublink.h>
+#include <Hublink.h>
 #include <HublinkBEAM.h>
 
 #define DO_DEBUG 1 // Set to 1 to enable serial debugging delays
 
 HublinkBEAM beam;
-// Hublink hublink(PIN_SD_CS);
+Hublink hublink(PIN_SD_CS);
 const unsigned long LOG_EVERY_MINUTES = 1;     // Log every X minutes
-const unsigned long SYNC_EVERY_MINUTES = 2;    // Sync every X minutes
+const unsigned long SYNC_EVERY_MINUTES = 1;    // Sync every X minutes
 const unsigned long SYNC_TIMEOUT_SECONDS = 20; // Sync timeout in seconds
 
 void setup()
@@ -27,16 +27,6 @@ void setup()
 
   // Configure alarm after beam initialization
   beam.setAlarmForEvery(SYNC_EVERY_MINUTES);
-
-  // if (hublink.begin())
-  // {
-  //   Serial.println("✓ Hublink.");
-  // }
-  // else
-  // {
-  //   Serial.println("✗ Failed.");
-  //   // do not block Hublink failure
-  // }
 }
 
 void loop()
@@ -50,7 +40,17 @@ void loop()
   if (beam.alarmForEvery())
   {
     Serial.println("Alarm triggered!");
-    // hublink.sync(SYNC_TIMEOUT_SECONDS);
+
+    // only begin when alarm is triggered (risks not catching error at setup though)
+    if (hublink.begin())
+    {
+      Serial.println("✓ Hublink.");
+      hublink.sync(SYNC_TIMEOUT_SECONDS);
+    }
+    else
+    {
+      Serial.println("✗ Failed.");
+    }
   }
 
   /*
