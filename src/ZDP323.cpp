@@ -4,10 +4,11 @@
 ZDP323::ZDP323(uint8_t i2cAddress)
     : _i2cAddress(i2cAddress), _initialized(false)
 {
-    _config.detlvl = ZDP323_CONFIG_DETLVL_DEFAULT;
-    _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
-    _config.fstep = ZDP323_CONFIG_FSTEP_2;
-    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_B;
+    // Initialize with default configuration
+    _config.detlvl = ZDP323_CONFIG_DETLVL_DEFAULT;  // 0x40 (64 * 8 = ±512 ADC)
+    _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED; // 0 (disabled)
+    _config.fstep = ZDP323_CONFIG_FSTEP_2;          // 11 (Step 2)
+    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_B;   // 000 (Type B)
 }
 
 bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
@@ -35,10 +36,10 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
 
     // Initial configuration with maximum threshold and trigger mode disabled
     Serial.println("  ZDP323: initial config");
-    _config.detlvl = 0xFF;
+    _config.detlvl = 0xFF; // Maximum threshold during stabilization
     _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
-    _config.fstep = ZDP323_CONFIG_FSTEP_2;
-    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_C;
+    _config.fstep = ZDP323_CONFIG_FSTEP_2;        // Step 2 (11)
+    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_B; // Type B (000)
 
     // Write config and check Peak Hold until stable
     const int maxAttempts = 50;
@@ -117,6 +118,13 @@ bool ZDP323::writeConfig()
     // Byte 5: Lower bit of DETLVL (bit 15) and reserved bits
     data[5] = (_config.detlvl & 0x01) << 7;
 
+    Serial.printf("  I2C write: addr=0x%02X, data=[", _i2cAddress);
+    for (int i = 0; i < 7; i++)
+    {
+        Serial.printf("0x%02X%s", data[i], i < 6 ? "," : "");
+    }
+    Serial.println("]");
+
     // Start transmission
     _wire->beginTransmission(_i2cAddress);
     _wire->write(data, 7);
@@ -124,7 +132,11 @@ bool ZDP323::writeConfig()
 
     if (result != 0)
     {
-        Serial.printf("***Config write failed with error %d***\n", result);
+        Serial.printf("  I2C error: code=%d (%s)\n", result,
+                      result == 1 ? "data too long" : result == 2 ? "NACK on addr"
+                                                  : result == 3   ? "NACK on data"
+                                                  : result == 4   ? "other error"
+                                                                  : "unknown");
     }
 
     return result == 0;
@@ -134,20 +146,24 @@ bool ZDP323::readPeakHold(int16_t *peakHold)
 {
     if (!peakHold)
     {
-        Serial.printf("***Peak hold read failed: null pointer***\n");
+        Serial.println("  Peak hold: null pointer");
         return false;
     }
+
+    Serial.printf("  I2C read: requesting 2 bytes from addr=0x%02X\n", _i2cAddress);
 
     // Request two bytes from the device
     uint8_t bytesRead = _wire->requestFrom(_i2cAddress, (uint8_t)2);
     if (bytesRead != 2)
     {
+        Serial.printf("  I2C read error: requested 2 bytes, got %d\n", bytesRead);
         return false;
     }
 
     // Read the two bytes
-    uint8_t msb = _wire->read(); // Upper byte (including 4 bits of peak hold)
-    uint8_t lsb = _wire->read(); // Lower byte
+    uint8_t msb = _wire->read();
+    uint8_t lsb = _wire->read();
+    Serial.printf("  I2C read: msb=0x%02X, lsb=0x%02X\n", msb, lsb);
 
     // Peak hold is a 12-bit signed value
     *peakHold = ((int16_t)(msb & 0x0F) << 8) | lsb;
@@ -188,12 +204,18 @@ void ZDP323::setFilterType(uint8_t type)
 
 bool ZDP323::enableTriggerMode()
 {
+    Serial.println("  ZDP323: enabling trigger mode");
     _config.trigom = ZDP323_CONFIG_TRIGOM_ENABLED;
-    return writeConfig();
+    bool success = writeConfig();
+    Serial.printf("  ZDP323: trigger mode enable %s\n", success ? "OK" : "FAILED");
+    return success;
 }
 
 bool ZDP323::disableTriggerMode()
 {
+    Serial.println("  ZDP323: disabling trigger mode");
     _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
-    return writeConfig();
+    bool success = writeConfig();
+    Serial.printf("  ZDP323: trigger mode disable %s\n", success ? "OK" : "FAILED");
+    return success;
 }

@@ -182,6 +182,9 @@ bool HublinkBEAM::begin()
     initPins();
     setNeoPixel(NEOPIXEL_BLUE);
 
+    // Normal initialization for timer wakeup or regular boot
+    Serial.println("beam.begin()...");
+
     // Initialize I2C for all cases
     Wire.begin();
     delay(10); // Give I2C time to stabilize
@@ -190,7 +193,7 @@ bool HublinkBEAM::begin()
     // Check wakeup reason immediately
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
-    // If we're in stage 1 (GPIO monitoring) and got a GPIO wakeup
+    // If we're in stage 1 (GPIO monitoring) and got a GPIO wakeup, turn on ULP
     if (sleep_config.sleep_stage == SLEEP_STAGE_GPIO_MONITOR &&
         wakeup_reason == ESP_SLEEP_WAKEUP_EXT0)
     {
@@ -254,9 +257,6 @@ bool HublinkBEAM::begin()
         esp_deep_sleep_start();
         return false; // Never reached
     }
-
-    // Normal initialization for timer wakeup or regular boot
-    Serial.println("Initializing BEAM...");
 
     bool allInitialized = true;
 
@@ -632,6 +632,7 @@ void HublinkBEAM::sleep(uint32_t seconds)
     Serial.flush();
 
     // Configure GPIO wakeup on SDA_GPIO (LOW)
+    Serial.println("  Configuring GPIO3/SDA for wakeup interrupt");
     esp_sleep_enable_ext0_wakeup((gpio_num_t)SDA_GPIO, 0);
 
     // Calculate remaining time based on original start time

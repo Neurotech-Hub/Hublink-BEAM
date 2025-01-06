@@ -1,7 +1,7 @@
 #include <HublinkBEAM.h>
 
 HublinkBEAM beam;
-const unsigned long LOG_INTERVAL = 60 * 5; // Log every (seconds)
+const unsigned long LOG_INTERVAL = 10; //60 * 5; // Log every (seconds)
 
 void setup()
 {
