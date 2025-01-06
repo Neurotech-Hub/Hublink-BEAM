@@ -7,8 +7,8 @@ ZDP323::ZDP323(uint8_t i2cAddress)
     // Initialize with default configuration
     _config.detlvl = ZDP323_CONFIG_DETLVL_DEFAULT;  // 0x40 (64 * 8 = ±512 ADC)
     _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED; // 0 (disabled)
-    _config.fstep = ZDP323_CONFIG_FSTEP_2;          // 11 (Step 2)
-    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_B;   // 000 (Type B)
+    _config.fstep = ZDP323_CONFIG_FSTEP_3;          // 11 (Step 3)
+    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_A;   // 000 (Type A)
 }
 
 bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
@@ -38,8 +38,8 @@ bool ZDP323::begin(TwoWire &wirePort, bool isWakeFromSleep)
     Serial.println("  ZDP323: initial config");
     _config.detlvl = 0xFF; // Maximum threshold during stabilization
     _config.trigom = ZDP323_CONFIG_TRIGOM_DISABLED;
-    _config.fstep = ZDP323_CONFIG_FSTEP_2;        // Step 2 (11)
-    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_B; // Type B (000)
+    _config.fstep = ZDP323_CONFIG_FSTEP_3;        // Step 2 (11)
+    _config.filsel = ZDP323_CONFIG_FILSEL_TYPE_A; // Type A (000)
 
     // Write config and check Peak Hold until stable
     const int maxAttempts = 50;

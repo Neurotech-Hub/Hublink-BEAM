@@ -1,15 +1,15 @@
 #include <HublinkBEAM.h>
 
 HublinkBEAM beam;
-const unsigned long LOG_INTERVAL = 10; //60 * 5; // Log every (seconds)
+const unsigned long LOG_INTERVAL = 60 * 5; // Log every (seconds)
 
 void setup()
 {
   Serial.begin(115200);
-  delay(1000); // !!serial
+  // delay(1000); // !!serial
 
   // Configure file creation behavior
-  beam.newFileOnBoot = false; // Continue using same file if it's the same day
+  beam.newFileOnBoot = true; // Continue using same file if it's the same day
 
   // Wait for the beam to initialize, retry (likely due to SD card ejecting)
   while (!beam.begin())
@@ -21,7 +21,7 @@ void setup()
 void loop()
 {
   beam.logData();
-  delay(1000); // !!serial
+  // delay(1000); // !!serial
 
   /*
    * Motion logging requires calling sleep() to enable the ULP coprocessor monitoring.
