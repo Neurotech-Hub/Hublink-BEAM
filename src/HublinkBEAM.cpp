@@ -24,7 +24,7 @@ bool HublinkBEAM::begin()
     setCpuFrequencyMhz(80);
 
     // Normal initialization for timer wakeup or regular boot
-    Serial.println("beam.begin()...");
+    Serial.println("\n\n\n----------\nbeam.begin()...\n----------\n");
 
     // Initialize sleep configuration if needed (preserve across retries)
     if (sleep_config.magic != SLEEP_CONFIG_MAGIC)
@@ -35,6 +35,10 @@ bool HublinkBEAM::begin()
         sleep_config.sleep_stage = SLEEP_STAGE_NORMAL;
         sleep_config.alarm_start_time = 0;
         sleep_config.alarm_interval = 0;
+
+        // Only initialize ULP on hard reset (when magic number is invalid)
+        _ulp.begin();
+        delay(10);
     }
 
     // Stop ULP to free up GPIO pins
@@ -151,9 +155,6 @@ bool HublinkBEAM::begin()
     // Only print full initialization report on first boot
     if (!_isWakeFromSleep)
     {
-        // Clear any stale PIR counts on first boot
-        _ulp.clearPIRCount();
-
         Serial.println("\nHublink BEAM Initialization Report:");
         Serial.println("--------------------------------");
         Serial.printf("PIR Sensor: %s\n", _isPIRInitialized ? "OK" : "FAILED");
@@ -420,10 +421,10 @@ String HublinkBEAM::getCurrentFilename()
         // If we have a stored filename, check if it exists and is from today
         if (storedFilename.length() > 0)
         {
-            // Extract date from stored filename (format: /YYMMDDXX.csv)
-            int storedYear = (storedFilename.substring(1, 3).toInt()) + 2000;
-            int storedMonth = storedFilename.substring(3, 5).toInt();
-            int storedDay = storedFilename.substring(5, 7).toInt();
+            // Extract date from stored filename (format: /BEAM_YYYYMMDDXX.csv)
+            int storedYear = storedFilename.substring(6, 10).toInt();
+            int storedMonth = storedFilename.substring(10, 12).toInt();
+            int storedDay = storedFilename.substring(12, 14).toInt();
 
             // Check if stored file is from today and exists
             if (storedYear == now.year() &&
@@ -447,20 +448,20 @@ String HublinkBEAM::getCurrentFilename()
     }
 
     // Create new filename with incremented number
-    char baseFilename[7]; // YYMMDD (6 chars + null terminator)
-    snprintf(baseFilename, sizeof(baseFilename), "%02d%02d%02d",
-             now.year() % 100, now.month(), now.day());
+    char baseFilename[11]; // YYYYMMDD (8 chars + null terminator)
+    snprintf(baseFilename, sizeof(baseFilename), "%04d%02d%02d",
+             now.year(), now.month(), now.day());
     Serial.printf("  Base filename: %s\n", baseFilename);
 
     // Scan files to find the highest existing number for today
     uint8_t nextNum = 0;
-    char testFilename[14]; // /YYMMDDXX.csv (13 chars + null terminator)
+    char testFilename[24]; // /BEAM_YYYYMMDDXX.csv (23 chars + null terminator)
 
     Serial.println("  Scanning for existing files:");
     // Test each possible number (00-99)
     while (nextNum < 100)
     {
-        snprintf(testFilename, sizeof(testFilename), "/%s%02d.csv", baseFilename, nextNum);
+        snprintf(testFilename, sizeof(testFilename), "/BEAM_%s%02d.csv", baseFilename, nextNum);
         Serial.printf("    Testing: %s - ", testFilename);
         if (!SD.exists(testFilename))
         {
@@ -472,8 +473,8 @@ String HublinkBEAM::getCurrentFilename()
     }
 
     // Create final filename with the next available number
-    char filename[14]; // /YYMMDDXX.csv (13 chars + null terminator)
-    snprintf(filename, sizeof(filename), "/%s%02d.csv", baseFilename, nextNum);
+    char filename[24]; // /BEAM_YYYYMMDDXX.csv (23 chars + null terminator)
+    snprintf(filename, sizeof(filename), "/BEAM_%s%02d.csv", baseFilename, nextNum);
     Serial.printf("  New filename: %s\n", filename);
 
     // Store the new filename in preferences immediately
@@ -561,6 +562,7 @@ bool HublinkBEAM::logData()
 
     // Get date/time and sensor readings
     DateTime now = getDateTime();
+    _int_rtc.setTime(now.unixtime());
 
     // Take forced measurement before reading BME280 values
     if (_isEnvSensorInitialized)
@@ -618,7 +620,7 @@ bool HublinkBEAM::logData()
 
 void HublinkBEAM::sleep(uint32_t minutes)
 {
-    uint32_t seconds = minutes * 60; // Convert minutes to seconds
+    uint32_t seconds = minutes; // * 60; // Convert minutes to seconds
 
     disableNeoPixel();
     digitalWrite(LED_BUILTIN, LOW);
@@ -649,14 +651,22 @@ void HublinkBEAM::sleep(uint32_t minutes)
         Serial.println("\nPreparing for Stage 1 Deep Sleep (GPIO monitoring)");
         Serial.printf("  Duration: %d minutes (%d seconds)\n", minutes, seconds);
         Serial.printf("  Start time: %d\n", sleep_config.sleep_start_time);
-
-        // Initialize ULP program (but don't start it yet)
-        _ulp.begin();
     }
-    else
+    else if (sleep_config.sleep_stage == SLEEP_STAGE_GPIO_MONITOR)
     {
+        // Clear PIR count when transitioning to Stage 2
+        _ulp.clearPIRCount();
+
         Serial.println("\nContinuing existing sleep cycle");
         Serial.printf("  Stage: %d\n", sleep_config.sleep_stage);
+        Serial.printf("  Original start time: %d\n", sleep_config.sleep_start_time);
+    }
+    else if (sleep_config.sleep_stage == SLEEP_STAGE_ULP_MONITOR)
+    {
+        // Clear PIR count when re-entering sleep from Stage 2
+        _ulp.clearPIRCount();
+
+        Serial.println("\nRe-entering sleep from Stage 2");
         Serial.printf("  Original start time: %d\n", sleep_config.sleep_start_time);
     }
 

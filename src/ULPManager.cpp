@@ -3,34 +3,25 @@
 // ULP program to count PIR trigger pulses (GPIO3)
 const ulp_insn_t ulp_program[] = {
     I_MOVI(R2, PIR_COUNT), // R2 = address of counter
-    I_LD(R1, R2, 0),       // R1 = current count
+    I_LD(R1, R2, 0),       // R1 = current count from RTC memory
 
-    M_LABEL(1),      // Main loop label
-    I_DELAY(0xFFFF), // Max delay (~374.5µs)
+    M_LABEL(1), // Main loop label
+
+    M_LABEL(2),    // GPIO polling loop
+    I_DELAY(1000), // Small delay (~37µs) between GPIO reads
 
     // Read GPIO3 state into R0
     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
 
-    // If GPIO is not LOW, continue monitoring
-    M_BG(1, 0), // if R0 > 0, continue monitoring
+    // If GPIO is HIGH (1), branch back to polling loop
+    M_BG(2, 0), // Branch to label 2 if R0 > 0 (HIGH)
 
-    // Motion detected (LOW), increment counter
+    // GPIO is LOW, increment counter
     I_ADDI(R1, R1, 1), // Increment count
     I_ST(R1, R2, 0),   // Store updated count
 
-    // Initialize delay counter
-    I_MOVI(R3, 0), // R3 = delay counter
-
-    // Delay loop for 1 second
-    M_LABEL(2),        // Delay loop label
-    I_DELAY(0xFFFF),   // Max delay (~374.5µs)
-    I_ADDI(R3, R3, 1), // Increment delay counter
-    I_MOVI(R0, 2669),  // Load comparison value
-    M_BG(3, R0),       // If counter > 2669, exit delay
-    M_BX(2),           // Otherwise continue delay loop
-
-    M_LABEL(3), // Delay complete
-    M_BX(1),    // Return to main monitoring loop
+    I_HALT(), // Stop until next timer wakeup (1 second)
+    M_BX(1),  // Return to main loop when timer wakes us
 };
 
 ULPManager::ULPManager()
@@ -40,6 +31,7 @@ ULPManager::ULPManager()
 
 void ULPManager::begin()
 {
+    Serial.println("  ULP: begin");
     // Configure I2C power pin
     rtc_gpio_init((gpio_num_t)PIN_I2C_POWER);
     rtc_gpio_set_direction((gpio_num_t)PIN_I2C_POWER, RTC_GPIO_MODE_OUTPUT_ONLY);
@@ -53,30 +45,39 @@ void ULPManager::begin()
     rtc_gpio_pulldown_dis(SDA_GPIO);
     rtc_gpio_hold_en(SDA_GPIO);
 
-    // Load ULP program
-    size_t size = sizeof(ulp_program) / sizeof(ulp_insn_t);
-    esp_err_t err = ulp_process_macros_and_load(PROG_START, ulp_program, &size);
-
-    if (err != ESP_OK)
-    {
-        Serial.printf("***ULP program load error: %d***\n", err);
-        return;
-    }
     _initialized = true;
+    Serial.println("  ULP: initialization complete");
 }
 
 void ULPManager::start()
 {
-    esp_err_t err = ulp_run(PROG_START);
+    Serial.println("  ULP: starting program");
+
+    // Always reload the ULP program when starting
+    size_t size = sizeof(ulp_program) / sizeof(ulp_insn_t);
+    esp_err_t err = ulp_process_macros_and_load(PROG_START, ulp_program, &size);
     if (err != ESP_OK)
     {
-        Serial.printf("***Error starting ULP program: %d***\n", err);
+        Serial.printf("  ULP: program load error: %d\n", err);
         return;
     }
+
+    // Configure ULP to wake up every 1 second (1,000,000 microseconds)
+    ulp_set_wakeup_period(0, 1000000);
+
+    err = ulp_run(PROG_START);
+    if (err != ESP_OK)
+    {
+        Serial.printf("  ULP: start error: %d\n", err);
+        return;
+    }
+    Serial.println("  ULP: program started");
 }
 
 void ULPManager::stop()
 {
+    Serial.println("  ULP: stopping program");
+
     // First disable holds
     rtc_gpio_hold_dis((gpio_num_t)PIN_I2C_POWER);
     rtc_gpio_hold_dis(SDA_GPIO);
@@ -91,15 +92,24 @@ void ULPManager::stop()
     rtc_gpio_set_direction((gpio_num_t)PIN_I2C_POWER, RTC_GPIO_MODE_DISABLED);
     rtc_gpio_deinit((gpio_num_t)PIN_I2C_POWER);
 
+    // Try to halt the ULP program
+    ulp_timer_stop();
+    ulp_set_wakeup_period(0, 0);
+
     delay(10); // Give some time for the pin to stabilize
+    Serial.println("  ULP: program stopped");
 }
 
 uint16_t ULPManager::getPIRCount()
 {
-    return (uint16_t)(RTC_SLOW_MEM[PIR_COUNT] & 0xFFFF);
+    uint16_t count = (uint16_t)(RTC_SLOW_MEM[PIR_COUNT] & 0xFFFF);
+    Serial.printf("  ULP: current PIR count: %d\n", count);
+    return count;
 }
 
 void ULPManager::clearPIRCount()
 {
+    Serial.println("  ULP: clearing PIR count");
     RTC_SLOW_MEM[PIR_COUNT] = 0;
+    Serial.printf("  ULP: verified count is now: %d\n", (uint16_t)(RTC_SLOW_MEM[PIR_COUNT] & 0xFFFF));
 }

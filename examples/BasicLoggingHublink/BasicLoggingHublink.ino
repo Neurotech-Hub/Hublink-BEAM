@@ -5,8 +5,8 @@
 
 HublinkBEAM beam;
 Hublink hublink(PIN_SD_CS);
-const unsigned long LOG_EVERY_MINUTES = 1;     // Log every X minutes
-const unsigned long SYNC_EVERY_MINUTES = 1;    // Sync every X minutes
+const unsigned long LOG_EVERY_MINUTES = 5;     // Log every X minutes
+const unsigned long SYNC_EVERY_MINUTES = 60;    // Sync every X minutes
 const unsigned long SYNC_TIMEOUT_SECONDS = 20; // Sync timeout in seconds
 
 void setup()
@@ -17,7 +17,7 @@ void setup()
 #endif
 
   // Configure file creation behavior
-  beam.newFileOnBoot = true; // Continue using same file if it's the same day
+  beam.newFileOnBoot = false; // false to continue using same file if it's the same day
 
   // Wait for the beam to initialize, retry (likely due to SD card ejecting)
   while (!beam.begin())

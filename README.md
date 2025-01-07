@@ -31,7 +31,7 @@ Files are named in the format `YYMMDDXX.csv` where:
 
 The sequence number handling can be controlled with the `newFileOnBoot` setting:
 ```cpp
-beam.newFileOnBoot = false; // Continue using same file if it's the same day
+beam.newFileOnBoot = false; // false to continue using same file if it's the same day
 ```
 
 - When `true` (default): Creates a new file with incremented sequence number on each boot
