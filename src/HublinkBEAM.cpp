@@ -35,10 +35,6 @@ bool HublinkBEAM::begin()
         sleep_config.sleep_stage = SLEEP_STAGE_NORMAL;
         sleep_config.alarm_start_time = 0;
         sleep_config.alarm_interval = 0;
-
-        // Only initialize ULP on hard reset (when magic number is invalid)
-        _ulp.begin();
-        delay(10);
     }
 
     // Stop ULP to free up GPIO pins
@@ -69,8 +65,13 @@ bool HublinkBEAM::begin()
         }
         _isRTCInitialized = true;
 
-        // Increment PIR count for the GPIO interrupt we just received
-        RTC_SLOW_MEM[PIR_COUNT]++;
+        // Stop any existing ULP program
+        _ulp.stop();
+        delay(10);
+
+        // Set PIR count to 1 for the GPIO interrupt we just received
+        RTC_SLOW_MEM[PIR_COUNT] = 1;
+        Serial.println("  Set PIR count to 1 for GPIO interrupt");
 
         // Calculate remaining sleep time
         int32_t current_time = getUnixTime();
@@ -90,7 +91,8 @@ bool HublinkBEAM::begin()
             elapsed_time = 0;
         }
 
-        uint32_t remaining_time = sleep_config.sleep_duration;
+        // Calculate remaining time, ensuring we don't go negative or exceed duration
+        uint32_t remaining_time = 0;
         if (elapsed_time < sleep_config.sleep_duration)
         {
             remaining_time = sleep_config.sleep_duration - elapsed_time;
@@ -107,10 +109,14 @@ bool HublinkBEAM::begin()
         sleep_config.sleep_start_time = current_time;
         sleep_config.sleep_duration = remaining_time; // Update duration to remaining time
 
-        // Start the ULP program (already initialized in sleep())
+        // Initialize ULP for Stage 2 with fresh count
+        _ulp.begin();
+        delay(10);
         _ulp.start();
+        delay(10);
 
         Serial.println("Entering Stage 2 Deep Sleep (ULP monitoring)");
+        Serial.printf("  Starting Stage 2 with fresh count\n");
         Serial.flush();
         disableNeoPixel();
 
@@ -137,6 +143,7 @@ bool HublinkBEAM::begin()
         {
             sleep_config.alarm_start_time = 0;
             sleep_config.alarm_interval = 0;
+            _ulp.clearPIRCount();
         }
     }
 
@@ -517,6 +524,8 @@ bool HublinkBEAM::createFile(String filename)
 bool HublinkBEAM::logData()
 {
     uint16_t motionCount = _ulp.getPIRCount();
+    uint32_t lastWakeTime = _ulp.getLastWakeTime();
+    Serial.printf("  ULP wake timing - Count: %d, Last wake time: %u\n", motionCount, lastWakeTime);
     _ulp.clearPIRCount(); // Reset counter after reading
 
     // Check for required sensors and SD card

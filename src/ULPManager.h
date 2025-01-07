@@ -5,6 +5,8 @@
 #include "esp32s3/ulp.h"
 #include "driver/rtc_io.h"
 #include "soc/rtc_io_reg.h"
+#include "soc/rtc_cntl_reg.h"
+#include "SharedDefs.h"
 
 // Move constants outside the class
 enum
@@ -25,6 +27,7 @@ public:
     void stop();  // Stop the ULP program
     uint16_t getPIRCount();
     void clearPIRCount();
+    uint32_t getLastWakeTime(); // Get the timestamp of the last ULP wake
 
 private:
     bool _initialized;

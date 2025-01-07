@@ -2,21 +2,22 @@
 
 // ULP program to count PIR trigger pulses (GPIO3)
 const ulp_insn_t ulp_program[] = {
-    I_MOVI(R2, PIR_COUNT), // R2 = address of counter
-    I_LD(R1, R2, 0),       // R1 = current count from RTC memory
+    I_MOVI(R2, PIR_COUNT),     // R2 = address of counter
+    I_MOVI(R3, ULP_WAKE_TIME), // R3 = address for timestamp storage
 
-    M_LABEL(1), // Main loop label
+    M_LABEL(1),      // Main loop label
+    I_LD(R1, R2, 0), // R1 = current count from RTC memory
 
-    M_LABEL(2),    // GPIO polling loop
-    I_DELAY(1000), // Small delay (~37µs) between GPIO reads
+    M_LABEL(2),    // Polling loop
+    I_DELAY(1000), // Small delay (~37µs) between reads
 
     // Read GPIO3 state into R0
     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
 
-    // If GPIO is HIGH (1), branch back to polling loop
-    M_BG(2, 0), // Branch to label 2 if R0 > 0 (HIGH)
+    // If HIGH, keep polling
+    M_BG(2, 0), // If HIGH (R0 > 0), continue polling
 
-    // GPIO is LOW, increment counter
+    // Found LOW, increment counter
     I_ADDI(R1, R1, 1), // Increment count
     I_ST(R1, R2, 0),   // Store updated count
 
@@ -112,4 +113,9 @@ void ULPManager::clearPIRCount()
     Serial.println("  ULP: clearing PIR count");
     RTC_SLOW_MEM[PIR_COUNT] = 0;
     Serial.printf("  ULP: verified count is now: %d\n", (uint16_t)(RTC_SLOW_MEM[PIR_COUNT] & 0xFFFF));
+}
+
+uint32_t ULPManager::getLastWakeTime()
+{
+    return (uint32_t)(RTC_SLOW_MEM[ULP_WAKE_TIME] & 0xFFFF);
 }
