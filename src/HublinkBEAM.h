@@ -15,7 +15,7 @@
 #include "esp_sleep.h"
 #include <Preferences.h>
 #include "SharedDefs.h"
-#include <ESP32Time.h>
+#include <RTClib.h>
 
 // Forward declarations
 class DateTime;
@@ -126,7 +126,6 @@ private:
     Adafruit_NeoPixel _pixel;
     ULPManager _ulp;
     Preferences _preferences;
-    ESP32Time _int_rtc;
 };
 
 #endif

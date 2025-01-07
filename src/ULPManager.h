@@ -27,7 +27,6 @@ public:
     void stop();  // Stop the ULP program
     uint16_t getPIRCount();
     void clearPIRCount();
-    uint32_t getLastWakeTime(); // Get the timestamp of the last ULP wake
 
 private:
     bool _initialized;

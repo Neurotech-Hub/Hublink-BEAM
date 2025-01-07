@@ -117,7 +117,9 @@ See the examples folder for detailed usage examples:
 - [x] BME280 has low power modes (in library); reduces from ~650µA to ~10µA
 - [x] MAX17048 has hibernation mode (in library); reduces from ~23µA to ~4µA
 - [x] SD card draws ~1200µA; could optimize
+- [ ] SD card detent pull-up could be ~60-160µA when card is present
 - [x] ZDP323 draws ~8µA (no low power mode)
+- [ ] consider rtc_gpio_isolate(GPIO_NUM_12); from [esp-idf/examples/system/ulp/ulp_fsm/ulp/main/ulp_example_main.c at v5.4 · espressif/esp-idf](https://github.com/espressif/esp-idf/blob/v5.4/examples/system/ulp/ulp_fsm/ulp/main/ulp_example_main.c)
 
 ## License
 

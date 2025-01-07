@@ -19,11 +19,9 @@ enum SleepStage
 // 0x000: PIR_COUNT (4 bytes)
 // 0x004: PROG_START (ULP program space)
 // 0x008: RTC_SLEEP_CONFIG (20 bytes)
-// 0x01C: ULP_WAKE_TIME (4 bytes)
 enum RTCMemorySlots
 {
-    RTC_SLEEP_CONFIG = 2, // After PIR_COUNT(0) and PROG_START(1)
-    ULP_WAKE_TIME = 7     // After sleep config (which uses slots 2-6)
+    RTC_SLEEP_CONFIG = 2 // After PIR_COUNT(0) and PROG_START(1)
 };
 
 // Sleep configuration structure (stored in RTC memory)

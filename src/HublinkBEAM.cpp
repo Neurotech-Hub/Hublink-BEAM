@@ -349,13 +349,16 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
         if (!isWakeFromSleep)
         {
             Serial.println("  PIR: starting stabilization");
-            // Use regular delay when USB is connected, light sleep otherwise
+            // Use delay if USB is connected, light sleep has issues disconnecting otherwise
             if (Serial)
             {
+                Serial.println("  PIR: using delay (USB connected)");
+                setNeoPixel(NEOPIXEL_PURPLE);
                 delay(ZDP323_TSTAB_MS);
             }
             else
             {
+                Serial.println("  PIR: using light sleep");
                 esp_sleep_enable_timer_wakeup(ZDP323_TSTAB_MS * 1000); // Convert ms to microseconds
                 esp_light_sleep_start();
                 esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
@@ -524,8 +527,6 @@ bool HublinkBEAM::createFile(String filename)
 bool HublinkBEAM::logData()
 {
     uint16_t motionCount = _ulp.getPIRCount();
-    uint32_t lastWakeTime = _ulp.getLastWakeTime();
-    Serial.printf("  ULP wake timing - Count: %d, Last wake time: %u\n", motionCount, lastWakeTime);
     _ulp.clearPIRCount(); // Reset counter after reading
 
     // Check for required sensors and SD card
@@ -571,7 +572,6 @@ bool HublinkBEAM::logData()
 
     // Get date/time and sensor readings
     DateTime now = getDateTime();
-    _int_rtc.setTime(now.unixtime());
 
     // Take forced measurement before reading BME280 values
     if (_isEnvSensorInitialized)
@@ -634,6 +634,7 @@ void HublinkBEAM::sleep(uint32_t minutes)
     disableNeoPixel();
     digitalWrite(LED_BUILTIN, LOW);
     digitalWrite(PIN_GREEN_LED, LOW);
+    pinMode(PIN_SD_DET, INPUT);
 
     // Prepare sensors for sleep (needed for both stages)
     if (_isPIRInitialized)
@@ -650,9 +651,6 @@ void HublinkBEAM::sleep(uint32_t minutes)
     // Only initialize sleep configuration if we're not already in a sleep cycle
     if (sleep_config.sleep_stage == SLEEP_STAGE_NORMAL)
     {
-        // Clear any existing PIR counts before starting new cycle
-        _ulp.clearPIRCount();
-
         sleep_config.sleep_duration = seconds; // Store duration in seconds
         sleep_config.sleep_start_time = getUnixTime();
         sleep_config.sleep_stage = SLEEP_STAGE_GPIO_MONITOR;
@@ -663,18 +661,12 @@ void HublinkBEAM::sleep(uint32_t minutes)
     }
     else if (sleep_config.sleep_stage == SLEEP_STAGE_GPIO_MONITOR)
     {
-        // Clear PIR count when transitioning to Stage 2
-        _ulp.clearPIRCount();
-
         Serial.println("\nContinuing existing sleep cycle");
         Serial.printf("  Stage: %d\n", sleep_config.sleep_stage);
         Serial.printf("  Original start time: %d\n", sleep_config.sleep_start_time);
     }
     else if (sleep_config.sleep_stage == SLEEP_STAGE_ULP_MONITOR)
     {
-        // Clear PIR count when re-entering sleep from Stage 2
-        _ulp.clearPIRCount();
-
         Serial.println("\nRe-entering sleep from Stage 2");
         Serial.printf("  Original start time: %d\n", sleep_config.sleep_start_time);
     }
@@ -698,7 +690,6 @@ void HublinkBEAM::sleep(uint32_t minutes)
     // Enable timer wakeup for the remaining duration
     uint64_t microseconds = (uint64_t)remaining * 1000000ULL;
     esp_sleep_enable_timer_wakeup(microseconds);
-
     esp_deep_sleep_start();
 }
 
