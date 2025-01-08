@@ -17,7 +17,7 @@ enum
 };
 
 const ulp_insn_t ulp_program[] = {
-    I_WR_REG(RTC_GPIO_OUT_REG, 13 + RTC_GPIO_OUT_DATA_S, 13 + RTC_GPIO_OUT_DATA_S, 0),
+    I_WR_REG(RTC_GPIO_OUT_REG, 13 + RTC_GPIO_OUT_DATA_S, 13 + RTC_GPIO_OUT_DATA_S, 1),
 
     I_HALT(), // Always halt after one complete execution
 };
