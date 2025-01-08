@@ -19,32 +19,33 @@ enum
 // ULP program to monitor PIR trigger (GPIO3) for LOW state with optimized delay
 const ulp_insn_t ulp_program[] = {
     I_MOVI(R2, MOTION_FLAG), // set R2 to motion flag address
+    I_LD(R3, R2, 0),         // Load current motion flag value into R3
 
-    M_LABEL(1),   // Main loop label
-    I_DELAY(200), // ~11.4µs delay @ 17.5MHz (57ns per cycle)
+    M_LABEL(1),   // New label for consistent halt point
+    I_DELAY(438), // 25µs delay
 
-    // Read GPIO3 state into R0
+    // Read GPIO3 state into R0 (we can reuse R0 now)
     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
 
-    // If GPIO is LOW (motion detected), store state and halt
-    M_BL(2, 1), // If R0 < 1 (LOW), branch to store/halt
+    // If GPIO is not LOW (no motion), skip the motion handling
+    M_BG(1, 0), // If R0 > 0 (HIGH), branch to label 1
 
-    // Otherwise loop back to start
-    M_BX(1), // Branch back to delay
+    // Motion detected (GPIO is LOW)
+    I_ADDI(R3, R3, 1), // Increment motion counter
+    I_ST(R3, R2, 0),   // Store updated counter
 
-    M_LABEL(2),      // Store and halt label
-    I_MOVI(R0, 1),   // Load 1 into R0
-    I_ST(R0, R2, 0), // Store 1 into motion flag
-    I_HALT(),        // Halt until next timer wake
+    I_HALT(), // Always halt after one complete execution
 };
 
 Adafruit_NeoPixel pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
 void setup()
 {
+    ulp_timer_stop();
     Serial.begin(115200);
     delay(1000);
-    Serial.println("Motion flag value: " + String(RTC_SLOW_MEM[MOTION_FLAG]));
+    int motionValue = RTC_SLOW_MEM[MOTION_FLAG];
+    Serial.println("Motion flag value: " + String(motionValue));
 
     // Initialize NeoPixel pins
     pinMode(NEOPIXEL_POWER, OUTPUT);
@@ -77,14 +78,17 @@ void setup()
         return;
     }
 
+    // Configure ULP to wake up every 1s
+    ulp_set_wakeup_period(0, 1000000);
+
     err = ulp_run(PROG_START);
     if (err != ESP_OK)
     {
         return;
     }
 
-    // Configure deep sleep wakeup timer (10 seconds)
-    esp_sleep_enable_timer_wakeup(5000000); // microseconds
+    // Configure deep sleep wakeup timer (1 seconds)
+    esp_sleep_enable_timer_wakeup(10000000); // microseconds
     esp_deep_sleep_start();
 }
 

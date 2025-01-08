@@ -3,8 +3,9 @@
 #include "esp_sleep.h"
 
 // Use RTC memory to maintain state across deep sleep
-static RTC_DATA_ATTR bool firstBoot = true;
-RTC_DATA_ATTR sleep_config_t sleep_config;
+static RTC_DATA_ATTR uint16_t alarm_interval = 0;
+static RTC_DATA_ATTR uint32_t alarm_start_time = 0;
+static RTC_DATA_ATTR uint32_t sleep_start_time = 0;
 
 HublinkBEAM::HublinkBEAM() : _pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800)
 {
@@ -16,30 +17,19 @@ HublinkBEAM::HublinkBEAM() : _pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800)
     _isRTCInitialized = false;
     _isLowBattery = false;
     _isWakeFromSleep = false;
+    _pir_percent_active = 0.0;
 }
 
 bool HublinkBEAM::begin()
 {
+    // Stop ULP to free up GPIO pins and stop ULP timer
+    _ulp.stop();
+
     // Set CPU frequency to 80MHz
     setCpuFrequencyMhz(80);
 
     // Normal initialization for timer wakeup or regular boot
     Serial.println("\n\n\n----------\nbeam.begin()...\n----------\n");
-
-    // Initialize sleep configuration if needed (preserve across retries)
-    if (sleep_config.magic != SLEEP_CONFIG_MAGIC)
-    {
-        Serial.println("Initializing sleep configuration");
-        memset(&sleep_config, 0, sizeof(sleep_config_t));
-        sleep_config.magic = SLEEP_CONFIG_MAGIC;
-        sleep_config.sleep_stage = SLEEP_STAGE_NORMAL;
-        sleep_config.alarm_start_time = 0;
-        sleep_config.alarm_interval = 0;
-    }
-
-    // Stop ULP to free up GPIO pins
-    _ulp.stop();
-    delay(10);
 
     // Initialize pins and set NeoPixel to blue during initialization
     initPins();
@@ -50,102 +40,12 @@ bool HublinkBEAM::begin()
     delay(10); // Give I2C time to stabilize
     Serial.println("  I2C: started");
 
-    // Check wakeup reason immediately
+    // Calculate PIR activity percentage if waking from sleep
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-
-    // If we're in stage 1 (GPIO monitoring) and got a GPIO wakeup, turn on ULP
-    if (sleep_config.sleep_stage == SLEEP_STAGE_GPIO_MONITOR &&
-        wakeup_reason == ESP_SLEEP_WAKEUP_EXT0)
-    {
-        // Quick initialization of RTC for time calculations
-        if (!_rtc.begin())
-        {
-            Serial.println("  Error: Failed to initialize RTC for time calculation");
-            return false;
-        }
-        _isRTCInitialized = true;
-
-        // Stop any existing ULP program
-        _ulp.stop();
-        delay(10);
-
-        // Set PIR count to 1 for the GPIO interrupt we just received
-        RTC_SLOW_MEM[PIR_COUNT] = 1;
-        Serial.println("  Set PIR count to 1 for GPIO interrupt");
-
-        // Calculate remaining sleep time
-        int32_t current_time = getUnixTime();
-        int32_t start_time = sleep_config.sleep_start_time;
-        int32_t elapsed_time = 0;
-
-        Serial.printf("  Debug - Current time: %d, Start time: %d\n", current_time, start_time);
-
-        // Ensure times are valid and calculate elapsed time
-        if (current_time >= start_time)
-        {
-            elapsed_time = current_time - start_time;
-        }
-        else
-        {
-            Serial.println("  Warning: Time calculation error, using full duration");
-            elapsed_time = 0;
-        }
-
-        // Calculate remaining time, ensuring we don't go negative or exceed duration
-        uint32_t remaining_time = 0;
-        if (elapsed_time < sleep_config.sleep_duration)
-        {
-            remaining_time = sleep_config.sleep_duration - elapsed_time;
-        }
-
-        Serial.println("\nMotion detected during Stage 1");
-        Serial.printf("  Current time: %d\n", current_time);
-        Serial.printf("  Start time: %d\n", start_time);
-        Serial.printf("  Elapsed time: %d seconds\n", elapsed_time);
-        Serial.printf("  Remaining time: %d seconds\n", remaining_time);
-
-        // Move to stage 2: ULP monitoring
-        sleep_config.sleep_stage = SLEEP_STAGE_ULP_MONITOR;
-        sleep_config.sleep_start_time = current_time;
-        sleep_config.sleep_duration = remaining_time; // Update duration to remaining time
-
-        // Initialize ULP for Stage 2 with fresh count
-        _ulp.begin();
-        delay(10);
-        _ulp.start();
-        delay(10);
-
-        Serial.println("Entering Stage 2 Deep Sleep (ULP monitoring)");
-        Serial.printf("  Starting Stage 2 with fresh count\n");
-        Serial.flush();
-        disableNeoPixel();
-
-        // Configure timer wakeup for remaining time
-        uint64_t remaining_microseconds = (uint64_t)remaining_time * 1000000ULL;
-        esp_sleep_enable_timer_wakeup(remaining_microseconds);
-
-        esp_deep_sleep_start();
-        return false; // Never reached
-    }
-
-    bool allInitialized = true;
-
-    // Check if this is a wake from deep sleep
     _isWakeFromSleep = (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER);
     Serial.printf("    Wake from sleep: %s\n", _isWakeFromSleep ? "YES" : "NO");
 
-    // Reset sleep stage on normal boot or timer wakeup
-    if (!_isWakeFromSleep || wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
-    {
-        sleep_config.sleep_stage = SLEEP_STAGE_NORMAL;
-        // Reset alarm start time on hard reset only
-        if (!_isWakeFromSleep)
-        {
-            sleep_config.alarm_start_time = 0;
-            sleep_config.alarm_interval = 0;
-            _ulp.clearPIRCount();
-        }
-    }
+    bool allInitialized = true; // Assume everything is OK until proven otherwise
 
     // Always reinitialize SD card after deep sleep
     if (!initSD())
@@ -162,6 +62,11 @@ bool HublinkBEAM::begin()
     // Only print full initialization report on first boot
     if (!_isWakeFromSleep)
     {
+        _ulp.clearPIRCount();
+        _pir_percent_active = 0.0;
+        alarm_interval = 0;
+        alarm_start_time = 0;
+
         Serial.println("\nHublink BEAM Initialization Report:");
         Serial.println("--------------------------------");
         Serial.printf("PIR Sensor: %s\n", _isPIRInitialized ? "OK" : "FAILED");
@@ -179,6 +84,22 @@ bool HublinkBEAM::begin()
         Serial.printf("SD Card: %s\n", _isSDInitialized ? "OK" : "FAILED");
         Serial.printf("Overall Status: %s\n", allInitialized ? "OK" : "FAILED");
         Serial.println("--------------------------------");
+    }
+    else
+    {
+        uint32_t current_time = getUnixTime();
+        uint32_t elapsed_seconds = current_time - sleep_start_time;
+        uint16_t pir_count = _ulp.getPIRCount();
+
+        // Calculate percentage (bound between 0-1)
+        // Each PIR count represents ULP_TIMER_PERIOD of active time
+        float active_seconds = (float)(pir_count * (ULP_TIMER_PERIOD / 1000000.0f));
+        _pir_percent_active = (elapsed_seconds > 0) ? min(1.0f, active_seconds / (float)elapsed_seconds) : 0.0f;
+
+        Serial.printf("\nPIR Activity Report:\n");
+        Serial.printf("  Total time: %d seconds\n", elapsed_seconds);
+        Serial.printf("  Active time: %.2f seconds\n", active_seconds);
+        Serial.printf("  Activity percentage: %.1f%%\n", _pir_percent_active * 100.0f);
     }
 
     // Set final NeoPixel state based on initialization result
@@ -199,7 +120,6 @@ bool HublinkBEAM::begin()
     }
 
     Serial.flush();
-    firstBoot = false;
 
     // Add debug delay if enabled
     if (doDebug())
@@ -208,12 +128,6 @@ bool HublinkBEAM::begin()
     }
 
     return allInitialized;
-}
-
-bool HublinkBEAM::isWakeFromDeepSleep()
-{
-    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-    return wakeup_reason == ESP_SLEEP_WAKEUP_TIMER;
 }
 
 void HublinkBEAM::initPins()
@@ -526,7 +440,7 @@ bool HublinkBEAM::createFile(String filename)
 
 bool HublinkBEAM::logData()
 {
-    uint16_t motionCount = _ulp.getPIRCount();
+    uint16_t pirCount = _ulp.getPIRCount();
     _ulp.clearPIRCount(); // Reset counter after reading
 
     // Check for required sensors and SD card
@@ -568,7 +482,7 @@ bool HublinkBEAM::logData()
     }
 
     // Set initial NeoPixel color based on motion
-    setNeoPixel(motionCount ? NEOPIXEL_GREEN : NEOPIXEL_BLUE);
+    setNeoPixel(pirCount ? NEOPIXEL_GREEN : NEOPIXEL_BLUE);
 
     // Get date/time and sensor readings
     DateTime now = getDateTime();
@@ -588,7 +502,7 @@ bool HublinkBEAM::logData()
     // Format data string
     char dataString[128];
     snprintf(dataString, sizeof(dataString),
-             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%.3f,%.2f,%.2f,%.2f,%.2f,%d,%d",
+             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%.3f,%.2f,%.2f,%.2f,%.2f,%d,%.1f,%d",
              now.year(), now.month(), now.day(),
              now.hour(), now.minute(), now.second(),
              millis(),
@@ -597,8 +511,9 @@ bool HublinkBEAM::logData()
              pressHpa,
              humidity,
              lux,
-             motionCount,
-             !_isWakeFromSleep); // 1 for fresh boot, 0 for wake from sleep
+             pirCount,
+             getPIRPercentActive(),
+             !_isWakeFromSleep);
 
     // Write data
     bool success = dataFile.println(dataString);
@@ -629,14 +544,27 @@ bool HublinkBEAM::logData()
 
 void HublinkBEAM::sleep(uint32_t minutes)
 {
-    uint32_t seconds = minutes; // * 60; // Convert minutes to seconds
+    uint32_t seconds = minutes * 60; // Convert minutes to seconds
 
+    // Read PIR count before sleep and clear it
+    uint16_t motionCount = _ulp.getPIRCount();
+    _ulp.clearPIRCount();
+    Serial.printf("\nPIR count before sleep: %d\n", motionCount);
+
+    // Record sleep start time for PIR activity calculation
+    if (_isRTCInitialized)
+    {
+        sleep_start_time = getUnixTime();
+        Serial.printf("Recording sleep start time: %d\n", sleep_start_time);
+    }
+
+    // Prepare for sleep
     disableNeoPixel();
     digitalWrite(LED_BUILTIN, LOW);
     digitalWrite(PIN_GREEN_LED, LOW);
     pinMode(PIN_SD_DET, INPUT);
 
-    // Prepare sensors for sleep (needed for both stages)
+    // Prepare sensors for sleep
     if (_isPIRInitialized)
     {
         _pirSensor.enableTriggerMode();
@@ -648,48 +576,14 @@ void HublinkBEAM::sleep(uint32_t minutes)
         _batteryMonitor.sleep(true);       // Enter sleep mode
     }
 
-    // Only initialize sleep configuration if we're not already in a sleep cycle
-    if (sleep_config.sleep_stage == SLEEP_STAGE_NORMAL)
-    {
-        sleep_config.sleep_duration = seconds; // Store duration in seconds
-        sleep_config.sleep_start_time = getUnixTime();
-        sleep_config.sleep_stage = SLEEP_STAGE_GPIO_MONITOR;
-
-        Serial.println("\nPreparing for Stage 1 Deep Sleep (GPIO monitoring)");
-        Serial.printf("  Duration: %d minutes (%d seconds)\n", minutes, seconds);
-        Serial.printf("  Start time: %d\n", sleep_config.sleep_start_time);
-    }
-    else if (sleep_config.sleep_stage == SLEEP_STAGE_GPIO_MONITOR)
-    {
-        Serial.println("\nContinuing existing sleep cycle");
-        Serial.printf("  Stage: %d\n", sleep_config.sleep_stage);
-        Serial.printf("  Original start time: %d\n", sleep_config.sleep_start_time);
-    }
-    else if (sleep_config.sleep_stage == SLEEP_STAGE_ULP_MONITOR)
-    {
-        Serial.println("\nRe-entering sleep from Stage 2");
-        Serial.printf("  Original start time: %d\n", sleep_config.sleep_start_time);
-    }
-
-    Serial.println("Entering Deep Sleep");
+    Serial.printf("\nEntering deep sleep for %d minutes (%d seconds)\n", minutes, seconds);
     Serial.flush();
 
-    // Configure GPIO wakeup on SDA_GPIO (LOW)
-    Serial.println("  Configuring GPIO3/SDA for wakeup interrupt");
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)SDA_GPIO, 0);
-
-    // Calculate remaining time based on original start time
-    uint32_t current_time = getUnixTime();
-    uint32_t elapsed = current_time - sleep_config.sleep_start_time;
-    uint32_t remaining = sleep_config.sleep_duration;
-    if (elapsed < sleep_config.sleep_duration)
-    {
-        remaining = sleep_config.sleep_duration - elapsed;
-    }
-
-    // Enable timer wakeup for the remaining duration
-    uint64_t microseconds = (uint64_t)remaining * 1000000ULL;
+    // Enable timer wakeup
+    uint64_t microseconds = (uint64_t)seconds * 1000000ULL;
     esp_sleep_enable_timer_wakeup(microseconds);
+    _ulp.begin(); // configure pins
+    _ulp.start(); // load/start ULP program
     esp_deep_sleep_start();
 }
 
@@ -875,44 +769,47 @@ void HublinkBEAM::setAlarmForEvery(uint16_t minutes)
         return;
     }
 
-    sleep_config.alarm_interval = minutes;
+    uint32_t current_time = getUnixTime();
 
-    // Only set start time if this is first configuration or after hard reset
-    if (sleep_config.alarm_start_time == 0)
+    // Check if we need to reset the alarm (either not set or expired)
+    if (alarm_start_time == 0 ||
+        current_time >= alarm_start_time + ((uint32_t)alarm_interval * 60))
     {
-        sleep_config.alarm_start_time = getUnixTime();
+        alarm_start_time = current_time;
         Serial.printf("setAlarmForEvery: Initialized alarm - interval: %d minutes, start time: %d\n",
-                      minutes, sleep_config.alarm_start_time);
+                      minutes, alarm_start_time);
     }
     else
     {
         Serial.printf("setAlarmForEvery: Updated interval to %d minutes (keeping existing start time: %d)\n",
-                      minutes, sleep_config.alarm_start_time);
+                      minutes, alarm_start_time);
     }
+
+    alarm_interval = minutes;
 }
 
 bool HublinkBEAM::alarmForEvery()
 {
-    if (!_isRTCInitialized || sleep_config.alarm_interval == 0)
+    if (!_isRTCInitialized || alarm_interval == 0)
     {
         Serial.println("alarmForEvery: RTC not initialized or no interval set");
         return false;
     }
 
     uint32_t current_time = getUnixTime();
-    uint32_t elapsed = current_time - sleep_config.alarm_start_time;
-    uint32_t interval_seconds = (uint32_t)sleep_config.alarm_interval * 60;
+    uint32_t elapsed = current_time - alarm_start_time;
+    uint32_t interval_seconds = (uint32_t)alarm_interval * 60;
 
     Serial.println("\nChecking alarm condition:");
     Serial.printf("  Current time: %d\n", current_time);
-    Serial.printf("  Start time: %d\n", sleep_config.alarm_start_time);
+    Serial.printf("  Start time: %d\n", alarm_start_time);
     Serial.printf("  Elapsed time: %d seconds\n", elapsed);
     Serial.printf("  Interval: %d seconds\n", interval_seconds);
 
     if (elapsed >= interval_seconds)
     {
         Serial.println("  → Alarm triggered!");
-        sleep_config.alarm_start_time = current_time;
+        alarm_start_time = current_time;
         return true;
     }
 

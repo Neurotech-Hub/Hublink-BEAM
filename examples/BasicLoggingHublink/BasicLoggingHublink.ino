@@ -5,7 +5,7 @@
 
 HublinkBEAM beam;
 Hublink hublink(PIN_SD_CS);
-const unsigned long LOG_EVERY_MINUTES = 5;      // Log every X minutes
+const unsigned long LOG_EVERY_MINUTES = 1;      // Log every X minutes
 const unsigned long SYNC_EVERY_MINUTES = 30;    // Sync every X minutes
 const unsigned long SYNC_TIMEOUT_SECONDS = 20;  // Sync timeout in seconds
 

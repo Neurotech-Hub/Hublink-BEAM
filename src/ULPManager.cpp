@@ -1,27 +1,25 @@
 #include "ULPManager.h"
 
-// ULP program to count PIR trigger pulses (GPIO3)
+// ULP program to monitor PIR trigger (GPIO3) for LOW state with optimized delay
 const ulp_insn_t ulp_program[] = {
-    I_MOVI(R2, PIR_COUNT), // R2 = address of counter
+    I_MOVI(R2, PIR_COUNT),                                                             // set R2 to motion flag address
+    I_LD(R3, R2, 0),                                                                   // Load current motion flag value into R3
+    I_WR_REG(RTC_GPIO_OUT_REG, 13 + RTC_GPIO_OUT_DATA_S, 13 + RTC_GPIO_OUT_DATA_S, 1), // LED ON
 
-    M_LABEL(1),      // Main loop label
-    I_LD(R1, R2, 0), // R1 = current count from RTC memory
+    M_LABEL(1),
+    I_DELAY(438),
 
-    M_LABEL(2),    // Polling loop
-    I_DELAY(1000), // Small delay (~37µs) between reads
-
+    // Clear R0 before reading GPIO
+    I_MOVI(R0, 0), // Initialize R0 to 0
     // Read GPIO3 state into R0
     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
 
-    // If HIGH, keep polling
-    M_BG(2, 0), // If HIGH (R0 > 0), continue polling
-
-    // Found LOW, increment counter
-    I_ADDI(R1, R1, 1), // Increment count
-    I_ST(R1, R2, 0),   // Store updated count
-
-    I_HALT(), // Stop until next timer wakeup (1 second)
-    M_BX(1),  // Return to main loop when timer wakes us
+    // If GPIO is not LOW (no motion), skip increment
+    M_BG(1, 0),        // If R0 > 0 (HIGH), branch 1 to repeat
+    I_ADDI(R3, R3, 1), // Increment motion counter if LOW
+    I_ST(R3, R2, 0),   // Store counter value
+    I_WR_REG(RTC_GPIO_OUT_REG, 13 + RTC_GPIO_OUT_DATA_S, 13 + RTC_GPIO_OUT_DATA_S, 1),
+    I_HALT() // Halt until next timer period
 };
 
 ULPManager::ULPManager()
@@ -37,6 +35,12 @@ void ULPManager::begin()
     rtc_gpio_set_direction((gpio_num_t)PIN_I2C_POWER, RTC_GPIO_MODE_OUTPUT_ONLY);
     rtc_gpio_set_level((gpio_num_t)PIN_I2C_POWER, 1);
     rtc_gpio_hold_en((gpio_num_t)PIN_I2C_POWER);
+
+    // Configure LED pin
+    rtc_gpio_init((gpio_num_t)LED_BUILTIN);
+    rtc_gpio_set_direction((gpio_num_t)LED_BUILTIN, RTC_GPIO_MODE_OUTPUT_ONLY);
+    rtc_gpio_set_level((gpio_num_t)LED_BUILTIN, 0);
+    rtc_gpio_hold_en((gpio_num_t)LED_BUILTIN);
 
     // Only configure SDA (GPIO3) for ULP reading
     rtc_gpio_init(SDA_GPIO);
@@ -63,7 +67,7 @@ void ULPManager::start()
     }
 
     // Configure ULP to wake up every 1 second (1,000,000 microseconds)
-    ulp_set_wakeup_period(0, 1000000);
+    ulp_set_wakeup_period(0, ULP_TIMER_PERIOD);
 
     err = ulp_run(PROG_START);
     if (err != ESP_OK)

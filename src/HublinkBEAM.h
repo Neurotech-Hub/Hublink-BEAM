@@ -20,9 +20,6 @@
 // Forward declarations
 class DateTime;
 
-// External declarations for RTC memory
-extern sleep_config_t sleep_config;
-
 // Pin Definitions
 #define PIN_SD_CS 12    // SD card chip select
 #define PIN_SD_DET 11   // SD card detection pin
@@ -47,7 +44,7 @@ extern sleep_config_t sleep_config;
 #define LOW_BATTERY_THRESHOLD 3.4
 
 // CSV Header
-#define CSV_HEADER "datetime,millis,battery_voltage,temperature_c,pressure_hpa,humidity_percent,lux,pir_count,reboot"
+#define CSV_HEADER "datetime,millis,battery_voltage,temperature_c,pressure_hpa,humidity_percent,lux,pir_count,pir_percent_active,reboot"
 
 class HublinkBEAM
 {
@@ -60,6 +57,9 @@ public:
 
     // File creation behavior
     bool newFileOnBoot = true; // Controls whether to create new file on each boot
+
+    // PIR activity tracking
+    float getPIRPercentActive() { return _pir_percent_active; }
 
     // NeoPixel control functions
     void setNeoPixel(uint32_t color);
@@ -110,7 +110,8 @@ private:
     bool doDebug();                   // Check if debug mode is enabled via BOOT_GPIO
 
     bool _isLowBattery;
-    bool _isWakeFromSleep; // Track wake state
+    bool _isWakeFromSleep;     // Track wake state
+    float _pir_percent_active; // Track PIR activity as fraction of sleep time
     File _dataFile;
     bool _isSDInitialized;
     ZDP323 _pirSensor;
