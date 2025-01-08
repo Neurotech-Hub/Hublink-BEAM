@@ -42,6 +42,10 @@ Adafruit_NeoPixel pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
 void setup()
 {
+    Serial.begin(115200);
+    delay(1000);
+    Serial.println("Motion flag value: " + String(RTC_SLOW_MEM[MOTION_FLAG]));
+
     // Initialize NeoPixel pins
     pinMode(NEOPIXEL_POWER, OUTPUT);
     digitalWrite(NEOPIXEL_POWER, HIGH);
@@ -80,7 +84,7 @@ void setup()
     }
 
     // Configure deep sleep wakeup timer (10 seconds)
-    esp_sleep_enable_timer_wakeup(10000000); // microseconds
+    esp_sleep_enable_timer_wakeup(5000000); // microseconds
     esp_deep_sleep_start();
 }
 

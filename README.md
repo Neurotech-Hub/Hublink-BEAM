@@ -128,3 +128,12 @@ This library is released under the MIT License. See the LICENSE file for details
 ## Author
 
 Matt Gaidica (gaidica@wustl.edu) 
+
+---
+
+The intent of the ULP is increment a counter when the GPIO goes low. Our PIR sensor sends a series of low pulses 50µs wide, often in bursts, when motion occurs. Therefore, we need to be able to detect the first of those pulses and increment the counter, then immediately I_HALT() to stop the ULP until the next timer wakeup. We are attempting to use a GPIO interrupt on the same line to wakeup from the first stage of deep sleep and turn on the ULP, in hopes of achieving very low power until the first motion event. This is why PIR_COUNT is set to 1 after that interrupt occurs, and why we only begin and start the ULP at that point in time. The ULP program:
+
+1. Poll GPIO continuously until we see a LOW pulse
+2. When LOW is detected, increment the counter once
+3. Halt until the next timer wakeup
+4. Repeat
