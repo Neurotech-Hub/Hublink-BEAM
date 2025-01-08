@@ -9,8 +9,6 @@ const ulp_insn_t ulp_program[] = {
     M_LABEL(1),
     I_DELAY(438),
 
-    // Clear R0 before reading GPIO
-    I_MOVI(R0, 0), // Initialize R0 to 0
     // Read GPIO3 state into R0
     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
 

@@ -16,26 +16,32 @@ enum
     PROG_START   // Program start address
 };
 
-// ULP program to monitor PIR trigger (GPIO3) for LOW state with optimized delay
 const ulp_insn_t ulp_program[] = {
-    I_MOVI(R2, MOTION_FLAG), // set R2 to motion flag address
-    I_LD(R3, R2, 0),         // Load current motion flag value into R3
-
-    M_LABEL(1),   // New label for consistent halt point
-    I_DELAY(438), // 25µs delay
-
-    // Read GPIO3 state into R0 (we can reuse R0 now)
-    I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
-
-    // If GPIO is not LOW (no motion), skip the motion handling
-    M_BG(1, 0), // If R0 > 0 (HIGH), branch to label 1
-
-    // Motion detected (GPIO is LOW)
-    I_ADDI(R3, R3, 1), // Increment motion counter
-    I_ST(R3, R2, 0),   // Store updated counter
+    I_WR_REG(RTC_GPIO_OUT_REG, 13 + RTC_GPIO_OUT_DATA_S, 13 + RTC_GPIO_OUT_DATA_S, 0),
 
     I_HALT(), // Always halt after one complete execution
 };
+
+// ULP program to monitor PIR trigger (GPIO3) for LOW state with optimized delay
+// const ulp_insn_t ulp_program[] = {
+//     I_MOVI(R2, MOTION_FLAG), // set R2 to motion flag address
+//     I_LD(R3, R2, 0),         // Load current motion flag value into R3
+
+//     M_LABEL(1),   // New label for consistent halt point
+//     I_DELAY(438), // 25µs delay
+
+//     // Read GPIO3 state into R0 (we can reuse R0 now)
+//     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
+
+//     // If GPIO is not LOW (no motion), skip the motion handling
+//     M_BG(1, 0), // If R0 > 0 (HIGH), branch to label 1
+
+//     // Motion detected (GPIO is LOW)
+//     I_ADDI(R3, R3, 1), // Increment motion counter
+//     I_ST(R3, R2, 0),   // Store updated counter
+
+//     I_HALT(), // Always halt after one complete execution
+// };
 
 Adafruit_NeoPixel pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
@@ -69,6 +75,12 @@ void setup()
     rtc_gpio_pullup_dis(SDA_GPIO); // Use hardware pullup
     rtc_gpio_pulldown_dis(SDA_GPIO);
     rtc_gpio_hold_en(SDA_GPIO);
+
+    // Configure LED pin
+    rtc_gpio_init((gpio_num_t)LED_BUILTIN);
+    rtc_gpio_set_direction((gpio_num_t)LED_BUILTIN, RTC_GPIO_MODE_OUTPUT_ONLY);
+    rtc_gpio_set_level((gpio_num_t)LED_BUILTIN, 0);
+    rtc_gpio_hold_en((gpio_num_t)LED_BUILTIN);
 
     // Load and start ULP program
     size_t size = sizeof(ulp_program) / sizeof(ulp_insn_t);
