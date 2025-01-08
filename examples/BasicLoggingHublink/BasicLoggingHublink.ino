@@ -1,7 +1,7 @@
 #include <Hublink.h>
 #include <HublinkBEAM.h>
 
-#define DO_DEBUG 1  // Set to 1 to enable serial debugging delays
+#define DO_DEBUG 0  // Set to 1 to enable serial debugging delays
 
 HublinkBEAM beam;
 Hublink hublink(PIN_SD_CS);
