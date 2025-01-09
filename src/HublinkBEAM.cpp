@@ -769,23 +769,19 @@ void HublinkBEAM::setAlarmForEvery(uint16_t minutes)
         return;
     }
 
-    uint32_t current_time = getUnixTime();
-
-    // Check if we need to reset the alarm (either not set or expired)
-    if (alarm_start_time == 0 ||
-        current_time >= alarm_start_time + ((uint32_t)alarm_interval * 60))
+    // Only set alarm if this is not a timer wakeup
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
     {
-        alarm_start_time = current_time;
-        Serial.printf("setAlarmForEvery: Initialized alarm - interval: %d minutes, start time: %d\n",
-                      minutes, alarm_start_time);
-    }
-    else
-    {
-        Serial.printf("setAlarmForEvery: Updated interval to %d minutes (keeping existing start time: %d)\n",
-                      minutes, alarm_start_time);
+        Serial.println("setAlarmForEvery: Skipping alarm set after timer wakeup");
+        return;
     }
 
+    // Initialize the perpetual alarm
+    alarm_start_time = getUnixTime();
     alarm_interval = minutes;
+    Serial.printf("setAlarmForEvery: Initialized perpetual alarm - interval: %d minutes, start time: %d\n",
+                  minutes, alarm_start_time);
 }
 
 bool HublinkBEAM::alarmForEvery()
@@ -809,7 +805,8 @@ bool HublinkBEAM::alarmForEvery()
     if (elapsed >= interval_seconds)
     {
         Serial.println("  → Alarm triggered!");
-        alarm_start_time = current_time;
+        // Update start time to the beginning of the next interval
+        alarm_start_time += interval_seconds;
         return true;
     }
 
