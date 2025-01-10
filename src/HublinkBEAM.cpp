@@ -335,10 +335,10 @@ String HublinkBEAM::getCurrentFilename()
     Serial.println("\nGetting current filename...");
     Serial.printf("  Wake from sleep: %s\n", _isWakeFromSleep ? "YES" : "NO");
 
-    // If waking from sleep or newFileOnBoot is false, try to retrieve stored filename
-    if (_isWakeFromSleep || !newFileOnBoot)
+    // Only check preferences if we're waking from sleep AND newFileOnBoot is false
+    if (_isWakeFromSleep && !newFileOnBoot)
     {
-        _preferences.begin(PREFS_NAMESPACE, false); // read-only mode
+        _preferences.begin(PREFS_NAMESPACE, false);
         String storedFilename = _preferences.getString("filename", "");
         _preferences.end();
 
@@ -349,6 +349,15 @@ String HublinkBEAM::getCurrentFilename()
             int storedYear = storedFilename.substring(6, 10).toInt();
             int storedMonth = storedFilename.substring(10, 12).toInt();
             int storedDay = storedFilename.substring(12, 14).toInt();
+
+            Serial.println("\nComparing dates:");
+            Serial.printf("  Stored filename: %s\n", storedFilename.c_str());
+            Serial.printf("  Stored date: %04d-%02d-%02d\n", storedYear, storedMonth, storedDay);
+            Serial.printf("  Current date: %04d-%02d-%02d\n", now.year(), now.month(), now.day());
+            Serial.printf("  Year match: %s\n", storedYear == now.year() ? "YES" : "NO");
+            Serial.printf("  Month match: %s\n", storedMonth == now.month() ? "YES" : "NO");
+            Serial.printf("  Day match: %s\n", storedDay == now.day() ? "YES" : "NO");
+            Serial.printf("  File exists: %s\n", SD.exists(storedFilename) ? "YES" : "NO");
 
             // Check if stored file is from today and exists
             if (storedYear == now.year() &&
@@ -368,6 +377,17 @@ String HublinkBEAM::getCurrentFilename()
             {
                 Serial.println("  Stored file is from a different day, creating new file");
             }
+        }
+    }
+    else
+    {
+        if (newFileOnBoot)
+        {
+            Serial.println("  newFileOnBoot is true, creating new file");
+        }
+        else
+        {
+            Serial.println("  First boot, creating new file");
         }
     }
 
