@@ -761,56 +761,61 @@ bool HublinkBEAM::isRTCConnected()
     return _isRTCInitialized;
 }
 
-void HublinkBEAM::setAlarmForEvery(uint16_t minutes)
+bool HublinkBEAM::alarm(uint16_t minutes)
 {
     if (!_isRTCInitialized)
     {
-        Serial.println("setAlarmForEvery: RTC not initialized");
-        return;
-    }
-
-    // Only set alarm if this is not a timer wakeup
-    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-    if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
-    {
-        Serial.println("setAlarmForEvery: Skipping alarm set after timer wakeup");
-        return;
-    }
-
-    // Initialize the perpetual alarm
-    alarm_start_time = getUnixTime();
-    alarm_interval = minutes;
-    Serial.printf("setAlarmForEvery: Initialized perpetual alarm - interval: %d minutes, start time: %d\n",
-                  minutes, alarm_start_time);
-}
-
-bool HublinkBEAM::alarmForEvery()
-{
-    if (!_isRTCInitialized || alarm_interval == 0)
-    {
-        Serial.println("alarmForEvery: RTC not initialized or no interval set");
+        Serial.println("alarm: RTC not initialized");
         return false;
     }
 
     uint32_t current_time = getUnixTime();
-    uint32_t elapsed = current_time - alarm_start_time;
+
+    // If minutes > 0, we're potentially setting up the alarm
+    if (minutes > 0)
+    {
+        // Only update interval and start time if this is first setup
+        if (alarm_start_time == 0)
+        {
+            alarm_interval = minutes;
+            alarm_start_time = current_time;
+            Serial.printf("alarm: First setup - interval %d minutes, start time %d\n",
+                          minutes, current_time);
+            return false;
+        }
+        // Otherwise just update the interval if it changed
+        else if (alarm_interval != minutes)
+        {
+            alarm_interval = minutes;
+            Serial.printf("alarm: Updated interval to %d minutes\n", minutes);
+        }
+    }
+
+    // If no interval is set, we can't check the alarm
+    if (alarm_interval == 0)
+    {
+        Serial.println("alarm: No interval set");
+        return false;
+    }
+
+    // Check if enough time has elapsed since the last alarm
     uint32_t interval_seconds = (uint32_t)alarm_interval * 60;
+    uint32_t next_alarm = alarm_start_time + interval_seconds;
 
     Serial.println("\nChecking alarm condition:");
     Serial.printf("  Current time: %d\n", current_time);
-    Serial.printf("  Start time: %d\n", alarm_start_time);
-    Serial.printf("  Elapsed time: %d seconds\n", elapsed);
-    Serial.printf("  Interval: %d seconds\n", interval_seconds);
+    Serial.printf("  Next alarm: %d\n", next_alarm);
+    Serial.printf("  Time to alarm: %d seconds\n",
+                  (current_time < next_alarm) ? (next_alarm - current_time) : 0);
 
-    if (elapsed >= interval_seconds)
+    if (current_time >= next_alarm)
     {
+        // Update start time to the next interval
+        alarm_start_time = next_alarm;
         Serial.println("  → Alarm triggered!");
-        // Update start time to the beginning of the next interval
-        alarm_start_time += interval_seconds;
         return true;
     }
 
-    Serial.printf("  → Not triggered (need %d more seconds)\n",
-                  interval_seconds - elapsed);
+    Serial.println("  → Not triggered");
     return false;
 }
