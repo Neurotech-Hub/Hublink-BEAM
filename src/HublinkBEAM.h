@@ -96,9 +96,8 @@ public:
     DateTime getFutureTime(int days, int hours, int minutes, int seconds);
     bool isRTCConnected();
 
-    // Alarm functions
-    void setAlarmForEvery(uint16_t minutes);
-    bool alarmForEvery();
+    // Alarm function: if minutes > 0, sets/updates alarm; if minutes = 0, checks if alarm triggered
+    bool alarm(uint16_t minutes = 0);
 
 private:
     void initPins();
