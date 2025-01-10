@@ -155,7 +155,9 @@ void RTCManager::updateCompilationID()
 
 void RTCManager::updateRTC()
 {
-    String compileDateTime = getCompileDateTime();
+    Serial.println("\nUpdating RTC time:");
+    Serial.println("----------------");
+    Serial.println("Compile time: " + getCompileDateTime());
 
     // Get compensated DateTime
     DateTime compensatedTime = getCompensatedDateTime();
@@ -165,6 +167,7 @@ void RTCManager::updateRTC()
     snprintf(timeStr, sizeof(timeStr), "%04d-%02d-%02d %02d:%02d:%02d",
              compensatedTime.year(), compensatedTime.month(), compensatedTime.day(),
              compensatedTime.hour(), compensatedTime.minute(), compensatedTime.second());
+    Serial.println("Compensated time: " + String(timeStr));
 
     // Update RTC with compensated time
     _rtc.adjust(compensatedTime);
@@ -175,4 +178,6 @@ void RTCManager::updateRTC()
     snprintf(currentTimeStr, sizeof(currentTimeStr), "%04d-%02d-%02d %02d:%02d:%02d",
              currentTime.year(), currentTime.month(), currentTime.day(),
              currentTime.hour(), currentTime.minute(), currentTime.second());
+    Serial.println("Verified time: " + String(currentTimeStr));
+    Serial.println("----------------\n");
 }
