@@ -14,7 +14,7 @@
 }}%%
 flowchart TB
     %% Title in upper left
-    title["Hublink BEAM\nFlowchart"]
+    title["Hublink BEAM Flowchart"]
     style title fill:none,stroke:none,color:#fff,font-size:20px,font-weight:bold
     
     %% Position title to the left of Start
@@ -25,47 +25,47 @@ flowchart TB
     subgraph ULP [ULP Program Loop]
         direction TB
         style ULP stroke-width:4px,stroke:#fd79a8,rx:10
-        ULPStart[Start ULP Program] --> ReadGPIO[Read GPIO3/SDA]
-        ReadGPIO --> Motion{Motion\nDetected?}
-        Motion -- Yes --> IncPIR[Increment PIR Count]
-        IncPIR --> ResetTracker[Reset Inactivity\nTracker]
-        Motion -- No --> IncTracker[Increment Inactivity\nTracker]
-        IncTracker --> CheckPeriod{Tracker >=\nPeriod?}
-        CheckPeriod -- Yes --> IncInactive[Increment Inactivity\nCount]
+        ULPStart[Start ULP] --> ReadGPIO[Read GPIO3]
+        ReadGPIO --> Motion{Motion?}
+        Motion -- Yes --> IncPIR[Inc PIR Count]
+        IncPIR --> ResetTracker[Reset Tracker]
+        Motion -- No --> IncTracker[Inc Tracker]
+        IncTracker --> CheckPeriod{Tracker >= Period?}
+        CheckPeriod -- Yes --> IncInactive[Inc Inactive]
         IncInactive --> ResetTracker
-        CheckPeriod -- No --> Delay[1-Second Delay]
+        CheckPeriod -- No --> Delay[1s Delay]
         ResetTracker --> Delay
         Delay --> ReadGPIO
     end
     
     %% Main Program Flow - After ULP or power on
-    Start[Power On/Reset] --> Init[Initialize HublinkBEAM]
+    Start[Power On/Reset] --> Init[Init BEAM]
     ULP --> Init
-    Init --> CheckWake{Wake from\nDeep Sleep?}
+    Init --> CheckWake{Wake from Sleep?}
     
     %% First Boot Path
-    CheckWake -- No --> FirstBoot[First Boot Setup]
-    FirstBoot --> InitSensors[Initialize Sensors]
-    InitSensors --> InitSD[Initialize SD Card]
-    InitSD --> ClearCounters[Clear PIR & Inactivity\nCounters]
+    CheckWake -- No --> FirstBoot[First Boot]
+    FirstBoot --> InitSensors[Init Sensors]
+    InitSensors --> InitSD[Init SD Card]
+    InitSD --> ClearCounters[Clear Counters]
     
     %% Wake from Sleep Path
-    CheckWake -- Yes --> CalcMetrics[Calculate Activity Metrics]
-    CalcMetrics --> ReadPIR[Read PIR Count]
-    ReadPIR --> CalcActive[Calculate Active Time]
-    CalcActive --> CalcInactive[Calculate Inactivity\nFraction]
+    CheckWake -- Yes --> CalcMetrics[Calc Metrics]
+    CalcMetrics --> ReadPIR[Read PIR]
+    ReadPIR --> CalcActive[Calc Active]
+    CalcActive --> CalcInactive[Calc Inactive]
     
     %% Main Loop from BasicLoggingHublink.ino
-    CalcInactive --> LogData[Log Data to SD]
+    CalcInactive --> LogData[Log Data]
     ClearCounters --> LogData
-    LogData --> CheckAlarm{Check Alarm\nInterval}
-    CheckAlarm -- Yes --> SyncData[Sync with Hublink]
-    CheckAlarm -- No --> PrepSleep[Prepare for Sleep]
+    LogData --> CheckAlarm{Check Alarm?}
+    CheckAlarm -- Yes --> SyncData[Sync Data]
+    CheckAlarm -- No --> PrepSleep[Prep Sleep]
     SyncData --> PrepSleep
     
     %% Sleep Preparation
-    PrepSleep --> ConfigULP[Configure ULP Program]
-    ConfigULP --> StartULP[Start ULP & Enter\nDeep Sleep]
+    PrepSleep --> ConfigULP[Config ULP]
+    ConfigULP --> StartULP[Start ULP & Sleep]
     StartULP --> ULP
 
     %% Styling
