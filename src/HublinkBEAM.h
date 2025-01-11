@@ -26,10 +26,6 @@ class DateTime;
 #define PIN_GREEN_LED 5 // On-board green LED
 #define NEOPIXEL_DIM 3
 
-// Debugging
-#define BOOT_GPIO 0
-#define DEBUG_DELAY_MS 1000
-
 // NeoPixel Colors
 #define NEOPIXEL_OFF 0x000000
 #define NEOPIXEL_RED 0xFF0000
@@ -108,7 +104,6 @@ private:
     bool createFile(String filename); // Creates new file with header
     bool isSDCardPresent();           // Checks if SD card is inserted
     bool isWakeFromDeepSleep();       // Check if we're waking from deep sleep
-    bool doDebug();                   // Check if debug mode is enabled via BOOT_GPIO
 
     bool _isLowBattery;
     bool _isWakeFromSleep;          // Track wake state

@@ -141,12 +141,6 @@ bool HublinkBEAM::begin()
 
     Serial.flush();
 
-    // Add debug delay if enabled
-    if (doDebug())
-    {
-        delay(DEBUG_DELAY_MS);
-    }
-
     return allInitialized;
 }
 
@@ -303,12 +297,6 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
 
     Serial.printf("  All sensors %s\n", allInitialized ? "OK" : "FAILED");
     return allInitialized;
-}
-
-bool HublinkBEAM::doDebug()
-{
-    pinMode(BOOT_GPIO, INPUT_PULLUP);
-    return (digitalRead(BOOT_GPIO) == LOW);
 }
 
 void HublinkBEAM::setNeoPixel(uint32_t color)
@@ -601,12 +589,6 @@ bool HublinkBEAM::logData()
         delay(1000);               // linger for a moment on error
     }
     Serial.flush();
-
-    // Add debug delay if enabled
-    if (doDebug())
-    {
-        delay(DEBUG_DELAY_MS);
-    }
 
     return success;
 }

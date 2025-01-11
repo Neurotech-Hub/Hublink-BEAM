@@ -13,12 +13,18 @@
     }
 }}%%
 flowchart TB
-    title[Hublink BEAM Flowchart]
-    style title fill:none,stroke:none,color:#fff,font-size:24px,font-weight:bold
+    %% Title in upper left
+    title["Hublink BEAM\nFlowchart"]
+    style title fill:none,stroke:none,color:#fff,font-size:20px,font-weight:bold
+    
+    %% Position title to the left of Start
+    title --> Start
+    linkStyle 0 stroke:none
     
     %% ULP Program Flow - Starts here after deep sleep
     subgraph ULP [ULP Program Loop]
         direction TB
+        style ULP stroke-width:4px,stroke:#fd79a8,rx:10
         ULPStart[Start ULP Program] --> ReadGPIO[Read GPIO3/SDA]
         ReadGPIO --> Motion{Motion\nDetected?}
         Motion -- Yes --> IncPIR[Increment PIR Count]
@@ -65,7 +71,7 @@ flowchart TB
     %% Styling
     classDef process fill:#2d3436,stroke:#00cec9,stroke-width:2px,color:#fff
     classDef decision fill:#2d3436,stroke:#ffeaa7,stroke-width:2px,color:#fff
-    classDef ulp fill:#2d3436,stroke:#fd79a8,stroke-width:2px,color:#fff
+    classDef ulp fill:#2d3436,stroke:#fd79a8,stroke-width:3px,color:#fff,font-size:18px
     
     class Start,Init,FirstBoot,InitSensors,InitSD,ClearCounters,LogData,PrepSleep,ConfigULP,StartULP process
     class CheckWake,CheckAlarm,Motion,CheckPeriod decision

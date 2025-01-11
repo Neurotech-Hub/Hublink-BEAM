@@ -8,6 +8,13 @@ An Arduino library for the Hublink BEAM ESP32-S3 data logging device. This libra
 2. In the Arduino IDE, go to Sketch -> Include Library -> Add .ZIP Library
 3. Select the downloaded repository
 
+LED Colors:
+- Blue: Starting up
+- Green: Motion detected (during data logging)
+- Red: Error (SD card or sensor failure)
+- Purple: Low battery
+- Off: Normal operation
+
 ## Data Logging
 
 ### CSV Format
@@ -20,18 +27,22 @@ Each log entry contains the following columns:
 - `humidity_percent`: Relative humidity percentage (-1.0 if sensor failed)
 - `lux`: Light level in lux (-1.0 if sensor failed)
 - `pir_count`: Number of motion events since last log
+- `pir_percent_active`: Fraction of time PIR was active (0-1)
+- `inactivity_period_s`: Configured inactivity period in seconds
+- `inactivity_count`: Number of complete inactivity periods
+- `inactivity_fraction`: Fraction of possible inactivity periods (0-1)
 - `reboot`: 1 if entry is from fresh boot, 0 if from wake from sleep
 
 ### File Creation Behavior
-Files are named in the format `YYMMDDXX.csv` where:
-- `YY`: Last two digits of year
+Files are named in the format `/BEAM_YYYYMMDDXX.csv` where:
+- `YYYY`: Year
 - `MM`: Month (01-12)
 - `DD`: Day (01-31)
 - `XX`: Sequence number (00-99)
 
-The sequence number handling can be controlled with the `newFileOnBoot` setting:
+The sequence number handling can be controlled with the `setNewFileOnBoot()` method:
 ```cpp
-beam.newFileOnBoot = false; // false to continue using same file if it's the same day
+beam.setNewFileOnBoot(false); // false to continue using same file if it's the same day
 ```
 
 - When `true` (default): Creates a new file with incremented sequence number on each boot
@@ -51,58 +62,33 @@ On power-up or reset, the device:
 3. Checks battery voltage (purple LED if battery < 3.4V)
 4. Initializes SD card (must be present)
 5. Sets up sensors and RTC
-6. Creates a new log file with today's date and next available number (YYMMDDXX.csv)
+6. Creates a new log file with today's date and next available number
 
 ## Deep Sleep Operation
 
-The device uses a sophisticated two-stage deep sleep process to optimize power consumption while maintaining accurate motion detection:
+The device uses the ESP32's ULP (Ultra Low Power) coprocessor to monitor motion while the main processor is in deep sleep. See [docs/flowchart.md](docs/flowchart.md) for a detailed flow diagram.
 
-### Stage 1: GPIO Monitoring
-- Initial stage after `sleep()` is called
-- Clears any existing PIR counts
-- Stores sleep duration and start time in RTC memory
-- Initializes (but doesn't start) ULP program
-- Configures GPIO wakeup on SDA_GPIO (LOW)
-- Enables PIR sensor's trigger mode
-- Puts battery monitor into sleep mode
-- Sets backup timer for full sleep duration
-- Enters deep sleep waiting for GPIO interrupt
+### Inactivity Period Configuration
+The inactivity period can be set using the `setInactivityPeriod()` method:
+```cpp
+beam.setInactivityPeriod(40); // 40 seconds of immobility indicates sleep
+```
 
-### Stage 2: ULP Monitoring
-- Activated only if motion is detected during Stage 1
-- Triggered by GPIO interrupt from PIR sensor
-- Stops ULP to free GPIO pins for I2C
-- Initializes I2C and RTC
-- Increments motion counter for Stage 1 interrupt
-- Calculates remaining sleep time
-- Starts ULP program to count additional triggers
-- Continues deep sleep for remaining duration
+The 40-second threshold is based on research by [Brown et al. (2017)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5140024/) which demonstrated that extended immobility of >40 seconds provides a reliable indicator of sleep, correlating well with EEG-defined sleep (Pearson's r >0.95, n=4 mice).
 
-### Sleep State Management
-- Sleep configuration stored in RTC memory
-- Tracks original sleep duration and start time
-- Preserves motion counts across sleep stages
-- Handles both GPIO and timer wakeup sources
-- Maintains I2C power state across stages
-- Properly manages GPIO pin states between stages
+### ULP Operation
+- ULP program continuously monitors the PIR sensor
+- Increments PIR count when motion is detected
+- Tracks inactivity periods based on configured duration
+- Maintains counters in RTC memory
+- Main processor reads counters upon waking
 
-### Benefits
-- Minimal power usage during quiet periods (Stage 1)
-- Accurate motion counting after initial trigger
-- No missed events during stage transition
-- Maintains original sleep duration timing
-- Preserves sensor states across stages
-- Clean GPIO and I2C management
-
-LED Colors:
-- Blue: Starting up
-- Green: Motion detected (during data logging)
-- Red: Error (SD card or sensor failure)
-- Purple: Low battery
-- Off: Normal operation
-
-Debug Mode:
-- Hold the BOOT button during operation to add delays for serial debugging
+### Sleep Process
+- Configures ULP program with current settings
+- Disables sensors and peripherals to save power
+- Enters deep sleep for specified duration
+- Wakes on timer expiration to log data
+- Calculates activity metrics upon wake
 
 ## Examples
 
@@ -131,7 +117,7 @@ Matt Gaidica (gaidica@wustl.edu)
 
 ---
 
-The intent of the ULP is increment a counter when the GPIO goes low. Our PIR sensor sends a series of low pulses 50µs wide, often in bursts, when motion occurs. Therefore, we need to be able to detect the first of those pulses and increment the counter, then immediately I_HALT() to stop the ULP until the next timer wakeup. We are attempting to use a GPIO interrupt on the same line to wakeup from the first stage of deep sleep and turn on the ULP, in hopes of achieving very low power until the first motion event. This is why PIR_COUNT is set to 1 after that interrupt occurs, and why we only begin and start the ULP at that point in time. The ULP program:
+The intent of the ULP is increment a counter when the GPIO goes low. Our PIR sensor sends a series of low pulses 50µs wide, often in bursts, when motion occurs. Therefore, we need to be able to detect the first of those pulses and increment the counter, then immediately I_HALT() to stop the ULP until the next timer wakeup. The ULP program:
 
 1. Poll GPIO continuously until we see a LOW pulse
 2. When LOW is detected, increment the counter once
