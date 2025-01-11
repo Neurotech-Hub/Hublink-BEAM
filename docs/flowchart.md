@@ -27,11 +27,11 @@ flowchart TB
         style ULP stroke-width:4px,stroke:#fd79a8,rx:10
         ULPStart[Start ULP] --> ReadGPIO[Read GPIO3]
         ReadGPIO --> Motion{Motion?}
-        Motion -- Yes --> IncPIR[Inc PIR Count]
+        Motion -- Yes --> IncPIR[++PIR Count]
         IncPIR --> ResetTracker[Reset Tracker]
-        Motion -- No --> IncTracker[Inc Tracker]
+        Motion -- No --> IncTracker[++Tracker]
         IncTracker --> CheckPeriod{Tracker >= Period?}
-        CheckPeriod -- Yes --> IncInactive[Inc Inactive]
+        CheckPeriod -- Yes --> IncInactive[++Inactive]
         IncInactive --> ResetTracker
         CheckPeriod -- No --> Delay[1s Delay]
         ResetTracker --> Delay
@@ -58,7 +58,7 @@ flowchart TB
     %% Main Loop from BasicLoggingHublink.ino
     CalcInactive --> LogData[Log Data]
     ClearCounters --> LogData
-    LogData --> CheckAlarm{Check Alarm?}
+    LogData --> CheckAlarm{Alarm?}
     CheckAlarm -- Yes --> SyncData[Sync Data]
     CheckAlarm -- No --> PrepSleep[Prep Sleep]
     SyncData --> PrepSleep
