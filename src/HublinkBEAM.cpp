@@ -93,13 +93,33 @@ bool HublinkBEAM::begin()
 
         // Calculate percentage (bound between 0-1)
         // Each PIR count represents ULP_TIMER_PERIOD of active time
-        float active_seconds = (float)(pir_count * (ULP_TIMER_PERIOD / 1000000.0f));
-        _pir_percent_active = (elapsed_seconds > 0) ? min(1.0f, active_seconds / (float)elapsed_seconds) : 0.0f;
+        // Use double for intermediate calculations to maintain precision
+        double active_seconds = static_cast<double>(pir_count) * (ULP_TIMER_PERIOD / 1000000.0);
+        _pir_percent_active = (elapsed_seconds > 0) ? std::min(1.0, active_seconds / static_cast<double>(elapsed_seconds)) : 0.0;
 
-        Serial.printf("\nPIR Activity Report:\n");
+        // Calculate inactivity fraction if period is set
+        _inactivity_fraction = 0.0;
+        if (_inactivityPeriod > 0)
+        {
+            uint16_t inactivity_count = _ulp.getInactivityCount();
+            double possible_inactive_periods = static_cast<double>(elapsed_seconds) /
+                                               static_cast<double>(_inactivityPeriod);
+            if (possible_inactive_periods > 0)
+            {
+                _inactivity_fraction = std::min(1.0,
+                                                static_cast<double>(inactivity_count) / possible_inactive_periods);
+            }
+        }
+
+        Serial.printf("\nActivity Report:\n");
         Serial.printf("  Total time: %d seconds\n", elapsed_seconds);
-        Serial.printf("  Active time: %.2f seconds\n", active_seconds);
-        Serial.printf("  Activity percentage: %.1f%%\n", _pir_percent_active * 100.0f);
+        Serial.printf("  Active time: %.3f seconds\n", active_seconds);
+        Serial.printf("  Activity percentage: %.3f%%\n", _pir_percent_active * 100.0);
+        if (_inactivityPeriod > 0)
+        {
+            Serial.printf("  Inactivity period: %d seconds\n", _inactivityPeriod);
+            Serial.printf("  Inactivity fraction: %.3f%%\n", _inactivity_fraction * 100.0);
+        }
     }
 
     // Set final NeoPixel state based on initialization result
@@ -334,10 +354,10 @@ String HublinkBEAM::getCurrentFilename()
     DateTime now = getDateTime();
     Serial.println("\nGetting current filename...");
     Serial.printf("  Wake from sleep: %s\n", _isWakeFromSleep ? "YES" : "NO");
-    Serial.printf("  newFileOnBoot: %s\n", newFileOnBoot ? "YES" : "NO");
+    Serial.printf("  newFileOnBoot: %s\n", getNewFileOnBoot() ? "YES" : "NO");
 
     // If newFileOnBoot is true, always create a new file
-    if (newFileOnBoot)
+    if (getNewFileOnBoot())
     {
         Serial.println("  newFileOnBoot is true, creating new file");
     }
@@ -387,7 +407,7 @@ String HublinkBEAM::getCurrentFilename()
         }
 
         // If we get here and newFileOnBoot is false, try to find the first existing file from today
-        if (!newFileOnBoot)
+        if (!getNewFileOnBoot())
         {
             char baseFilename[11]; // YYYYMMDD (8 chars + null terminator)
             snprintf(baseFilename, sizeof(baseFilename), "%04d%02d%02d",
@@ -486,8 +506,8 @@ bool HublinkBEAM::createFile(String filename)
 
 bool HublinkBEAM::logData()
 {
-    uint16_t pirCount = _ulp.getPIRCount();
-    _ulp.clearPIRCount(); // Reset counter after reading
+    uint16_t pirCount = _ulp.getPIRCount(); // clear in sleep()
+    uint16_t inactivityCount = (_inactivityPeriod > 0) ? _ulp.getInactivityCount() : 0;
 
     // Check for required sensors and SD card
     if (!_isSDInitialized || !isSDCardPresent())
@@ -545,10 +565,10 @@ bool HublinkBEAM::logData()
     float humidity = _isEnvSensorInitialized ? getHumidity() : -1.0f;
     float lux = _isLightSensorInitialized ? getLux() : -1.0f;
 
-    // Format data string
+    // Format data string with new fields
     char dataString[128];
     snprintf(dataString, sizeof(dataString),
-             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%.3f,%.2f,%.2f,%.2f,%.2f,%d,%.1f,%d",
+             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%.3f,%.2f,%.2f,%.2f,%.2f,%d,%.3f,%d,%d,%.3f,%d",
              now.year(), now.month(), now.day(),
              now.hour(), now.minute(), now.second(),
              millis(),
@@ -558,7 +578,10 @@ bool HublinkBEAM::logData()
              humidity,
              lux,
              pirCount,
-             getPIRPercentActive(),
+             _pir_percent_active,
+             _inactivityPeriod,
+             inactivityCount,
+             _inactivity_fraction,
              !_isWakeFromSleep);
 
     // Write data
@@ -592,16 +615,17 @@ void HublinkBEAM::sleep(uint32_t minutes)
 {
     uint32_t seconds = minutes * 60; // Convert minutes to seconds
 
-    // Read PIR count before sleep and clear it
-    uint16_t motionCount = _ulp.getPIRCount();
-    _ulp.clearPIRCount();
-    Serial.printf("\nPIR count before sleep: %d\n", motionCount);
-
     // Record sleep start time for PIR activity calculation
     if (_isRTCInitialized)
     {
         sleep_start_time = getUnixTime();
         Serial.printf("Recording sleep start time: %d\n", sleep_start_time);
+    }
+
+    // Configure ULP inactivity period if set
+    if (_inactivityPeriod > 0)
+    {
+        _ulp.setInactivityPeriod(_inactivityPeriod);
     }
 
     // Prepare for sleep

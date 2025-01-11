@@ -2,30 +2,49 @@
 
 // ULP program to monitor PIR trigger (GPIO3) for LOW state with optimized delay
 const ulp_insn_t ulp_program[] = {
-    I_MOVI(R2, PIR_COUNT), // set R2 to motion flag address
-    I_LD(R3, R2, 0),       // Load current motion flag value into R3
+    // Load addresses into registers we'll use throughout the program
+    I_MOVI(R2, PIR_COUNT),          // R2 = PIR count address
+    I_MOVI(R3, INACTIVITY_TRACKER), // R3 = Inactivity tracker address
 
     M_LABEL(1),
-    // I_WR_REG(RTC_GPIO_OUT_REG, 13 + RTC_GPIO_OUT_DATA_S, 13 + RTC_GPIO_OUT_DATA_S, 1), // LED ON
     I_DELAY(438), // debounce 25µs
 
     // Read GPIO3 state into R0
     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
 
-    // If GPIO is not LOW (no motion), skip increment
-    M_BG(1, 0),        // If R0 > 0 (HIGH), branch 1 to repeat
-    I_ADDI(R3, R3, 1), // Increment motion counter if LOW
-    I_ST(R3, R2, 0),   // Store counter value
+    // If GPIO is not LOW (no motion), skip PIR increment and tracker reset
+    M_BG(2, 0),        // If R0 > 0 (HIGH), branch to label 2
+    I_LD(R0, R2, 0),   // Load current PIR count
+    I_ADDI(R0, R0, 1), // Increment PIR count
+    I_ST(R0, R2, 0),   // Store updated PIR count
+    I_MOVI(R0, 0),     // Reset inactivity tracker
+    I_ST(R0, R3, 0),   // Store reset tracker
+    M_BX(3),           // Jump to delay section
 
-    // I_WR_REG(RTC_GPIO_OUT_REG, 13 + RTC_GPIO_OUT_DATA_S, 13 + RTC_GPIO_OUT_DATA_S, 0), // LED OFF
+    // Handle inactivity tracking
+    M_LABEL(2),
+    I_LD(R0, R3, 0),               // Load current tracker value
+    I_ADDI(R0, R0, 1),             // Increment tracker
+    I_ST(R0, R3, 0),               // Store updated tracker
+    I_MOVI(R1, INACTIVITY_PERIOD), // Load period address
+    I_LD(R1, R1, 0),               // Load period value
+    M_BL(3, 1),                    // If tracker < period, skip to delay
+    I_MOVI(R1, INACTIVITY_COUNT),  // Load count address
+    I_LD(R0, R1, 0),               // Load current count
+    I_ADDI(R0, R0, 1),             // Increment count
+    I_ST(R0, R1, 0),               // Store updated count
+    I_MOVI(R0, 0),                 // Reset tracker
+    I_ST(R0, R3, 0),               // Store reset tracker
 
+    // 1-second delay section
+    M_LABEL(3),
     I_MOVI(R1, 270),   // Load iteration count into R1, 270 x 0xFFFF = 1s
-    M_LABEL(2),        // Start of delay loop
+    M_LABEL(4),        // Start of delay loop
     I_DELAY(0xFFFF),   // Maximum delay
     I_SUBI(R1, R1, 1), // Decrement counter in R1
     I_MOVR(R0, R1),    // Move R1 to R0 for comparison
-    M_BG(2, 0),        // If R0 > 0 (R1 > 0), branch to label 2
-    M_BX(1),           // Jump back to main loop (label 1)
+    M_BG(4, 0),        // If R0 > 0 (R1 > 0), branch to delay loop
+    M_BX(1),           // Jump back to main loop
 };
 
 ULPManager::ULPManager()
@@ -51,6 +70,10 @@ void ULPManager::begin()
     rtc_gpio_set_direction(SDA_GPIO, RTC_GPIO_MODE_INPUT_ONLY);
     rtc_gpio_pullup_dis(SDA_GPIO); // Use hardware pullup
     rtc_gpio_pulldown_dis(SDA_GPIO);
+
+    // Clear all counters
+    clearPIRCount();
+    clearInactivityCounters();
 
     _initialized = true;
     Serial.println("  ULP: initialization complete");
@@ -130,4 +153,34 @@ void ULPManager::clearPIRCount()
     Serial.println("  ULP: clearing PIR count");
     RTC_SLOW_MEM[PIR_COUNT] = 0;
     Serial.printf("  ULP: verified count is now: %d\n", (uint16_t)(RTC_SLOW_MEM[PIR_COUNT] & 0xFFFF));
+}
+
+void ULPManager::setInactivityPeriod(uint16_t seconds)
+{
+    Serial.printf("  ULP: setting inactivity period to %d seconds\n", seconds);
+    RTC_SLOW_MEM[INACTIVITY_PERIOD] = seconds;
+}
+
+uint16_t ULPManager::getInactivityCount()
+{
+    uint16_t count = (uint16_t)(RTC_SLOW_MEM[INACTIVITY_COUNT] & 0xFFFF);
+    Serial.printf("  ULP: current inactivity count: %d\n", count);
+    return count;
+}
+
+uint16_t ULPManager::getInactivityTracker()
+{
+    uint16_t tracker = (uint16_t)(RTC_SLOW_MEM[INACTIVITY_TRACKER] & 0xFFFF);
+    Serial.printf("  ULP: current inactivity tracker: %d\n", tracker);
+    return tracker;
+}
+
+void ULPManager::clearInactivityCounters()
+{
+    Serial.println("  ULP: clearing inactivity counters");
+    RTC_SLOW_MEM[INACTIVITY_COUNT] = 0;
+    RTC_SLOW_MEM[INACTIVITY_TRACKER] = 0;
+    Serial.printf("  ULP: verified counters are now: count=%d, tracker=%d\n",
+                  (uint16_t)(RTC_SLOW_MEM[INACTIVITY_COUNT] & 0xFFFF),
+                  (uint16_t)(RTC_SLOW_MEM[INACTIVITY_TRACKER] & 0xFFFF));
 }

@@ -44,7 +44,7 @@ class DateTime;
 #define LOW_BATTERY_THRESHOLD 3.4
 
 // CSV Header
-#define CSV_HEADER "datetime,millis,battery_voltage,temperature_c,pressure_hpa,humidity_percent,lux,pir_count,pir_percent_active,reboot"
+#define CSV_HEADER "datetime,millis,battery_voltage,temperature_c,pressure_hpa,humidity_percent,lux,pir_count,pir_percent_active,inactivity_period_s,inactivity_count,inactivity_fraction,reboot"
 
 class HublinkBEAM
 {
@@ -56,10 +56,12 @@ public:
     void sleep(uint32_t minutes);
 
     // File creation behavior
-    bool newFileOnBoot = true; // Controls whether to create new file on each boot
+    void setNewFileOnBoot(bool value) { _newFileOnBoot = value; }
+    bool getNewFileOnBoot() { return _newFileOnBoot; }
 
-    // PIR activity tracking
-    float getPIRPercentActive() { return _pir_percent_active; }
+    // Inactivity period control
+    void setInactivityPeriod(uint16_t seconds) { _inactivityPeriod = seconds; }
+    uint16_t getInactivityPeriod() { return _inactivityPeriod; }
 
     // NeoPixel control functions
     void setNeoPixel(uint32_t color);
@@ -109,8 +111,11 @@ private:
     bool doDebug();                   // Check if debug mode is enabled via BOOT_GPIO
 
     bool _isLowBattery;
-    bool _isWakeFromSleep;     // Track wake state
-    float _pir_percent_active; // Track PIR activity as fraction of sleep time
+    bool _isWakeFromSleep;          // Track wake state
+    bool _newFileOnBoot = true;     // Controls whether to create new file on each boot
+    double _pir_percent_active;     // Track PIR activity as fraction of sleep time
+    double _inactivity_fraction;    // Track inactivity as fraction of possible periods
+    uint16_t _inactivityPeriod = 0; // Inactivity period in seconds (0 = disabled)
     File _dataFile;
     bool _isSDInitialized;
     ZDP323 _pirSensor;
