@@ -38,17 +38,21 @@ void loop()
   if (beam.alarm(SYNC_EVERY_MINUTES))
   {
     Serial.println("Alarm triggered!");
+    Serial.printf("Heap before Hublink operations: %lu bytes\n", ESP.getFreeHeap());
 
     // only begin when alarm is triggered (risks not catching error at setup though)
     if (hublink.begin())
     {
       Serial.println("✓ Hublink.");
+      Serial.printf("Heap after hublink.begin(): %lu bytes\n", ESP.getFreeHeap());
       hublink.sync(SYNC_FOR_SECONDS);
+      Serial.printf("Heap after hublink.sync(): %lu bytes\n", ESP.getFreeHeap());
     }
     else
     {
       Serial.println("✗ Failed.");
     }
+    Serial.printf("Heap after Hublink operations: %lu bytes\n", ESP.getFreeHeap());
   }
 
   /*
