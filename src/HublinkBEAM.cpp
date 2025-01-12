@@ -22,6 +22,7 @@ HublinkBEAM::HublinkBEAM() : _pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800)
 
 bool HublinkBEAM::begin()
 {
+    Serial.printf("\nHeap - begin() start: %lu bytes\n", ESP.getFreeHeap());
     // Stop ULP to free up GPIO pins and stop ULP timer
     _ulp.stop();
 
@@ -172,6 +173,7 @@ void HublinkBEAM::initPins()
 
 bool HublinkBEAM::initSensors(bool isWakeFromSleep)
 {
+    Serial.printf("\nHeap - before sensor init: %lu bytes\n", ESP.getFreeHeap());
     bool allInitialized = true;
     Serial.println("Initializing sensors...");
 
@@ -296,6 +298,7 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
     }
 
     Serial.printf("  All sensors %s\n", allInitialized ? "OK" : "FAILED");
+    Serial.printf("Heap - after sensor init: %lu bytes\n", ESP.getFreeHeap());
     return allInitialized;
 }
 
@@ -496,6 +499,7 @@ bool HublinkBEAM::logData()
 {
     uint16_t pirCount = _ulp.getPIRCount(); // clear in sleep()
     uint16_t inactivityCount = (_inactivityPeriod > 0) ? _ulp.getInactivityCount() : 0;
+    _minFreeHeap = ESP.getMinFreeHeap(); // Get minimum free heap since boot
 
     // Check for required sensors and SD card
     if (!_isSDInitialized || !isSDCardPresent())
@@ -556,7 +560,7 @@ bool HublinkBEAM::logData()
     // Format data string with new fields
     char dataString[128];
     snprintf(dataString, sizeof(dataString),
-             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%.3f,%.2f,%.2f,%.2f,%.2f,%d,%.3f,%d,%d,%.3f,%d",
+             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%.3f,%.2f,%.2f,%.2f,%.2f,%d,%.3f,%d,%d,%.3f,%lu,%d",
              now.year(), now.month(), now.day(),
              now.hour(), now.minute(), now.second(),
              millis(),
@@ -570,6 +574,7 @@ bool HublinkBEAM::logData()
              _inactivityPeriod,
              inactivityCount,
              _inactivity_fraction,
+             _minFreeHeap,
              !_isWakeFromSleep);
 
     // Write data
@@ -628,7 +633,8 @@ void HublinkBEAM::sleep(uint32_t minutes)
         _batteryMonitor.sleep(true);       // Enter sleep mode
     }
 
-    Serial.printf("\nEntering deep sleep for %d minutes (%d seconds)\n", minutes, seconds);
+    Serial.printf("\nHeap - before deep sleep: %lu bytes\n", ESP.getFreeHeap());
+    Serial.printf("Entering deep sleep for %d minutes (%d seconds)\n", minutes, seconds);
     Serial.flush();
 
     // Enable timer wakeup

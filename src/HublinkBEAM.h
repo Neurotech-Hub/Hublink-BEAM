@@ -40,7 +40,7 @@ class DateTime;
 #define LOW_BATTERY_THRESHOLD 3.4
 
 // CSV Header
-#define CSV_HEADER "datetime,millis,battery_voltage,temperature_c,pressure_hpa,humidity_percent,lux,pir_count,pir_percent_active,inactivity_period_s,inactivity_count,inactivity_fraction,reboot"
+#define CSV_HEADER "datetime,millis,battery_voltage,temperature_c,pressure_hpa,humidity_percent,lux,pir_count,pir_percent_active,inactivity_period_s,inactivity_count,inactivity_fraction,min_free_heap,reboot"
 
 class HublinkBEAM
 {
@@ -111,6 +111,7 @@ private:
     double _pir_percent_active;     // Track PIR activity as fraction of sleep time
     double _inactivity_fraction;    // Track inactivity as fraction of possible periods
     uint16_t _inactivityPeriod = 0; // Inactivity period in seconds (0 = disabled)
+    uint32_t _minFreeHeap;          // Track minimum free heap
     File _dataFile;
     bool _isSDInitialized;
     ZDP323 _pirSensor;
