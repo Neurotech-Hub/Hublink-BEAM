@@ -14,7 +14,7 @@
 }}%%
 flowchart TB
     %% Title in upper left
-    title["Hublink BEAM Flowchart"]
+    title["Deep Sleep Logic"]
     style title fill:none,stroke:none,color:#fff,font-size:20px,font-weight:bold
     
     %% Position title to the left of Start
@@ -25,17 +25,24 @@ flowchart TB
     subgraph ULP [ULP Program Loop]
         direction TB
         style ULP stroke-width:4px,stroke:#fd79a8,rx:10
-        ULPStart[Start ULP] --> ReadGPIO[Read GPIO3]
+        ULPStart[Start ULP] --> InitFlag[Init Motion Flag]
+        InitFlag --> StartWindow[Start 1s Window]
+        StartWindow --> ReadGPIO[Read GPIO3]
         ReadGPIO --> Motion{Motion?}
-        Motion -- Yes --> IncPIR[++PIR Count]
-        IncPIR --> ResetTracker[Reset Tracker]
-        Motion -- No --> IncTracker[++Tracker]
+        Motion -- No --> Delay[Delay]
+        Motion -- Yes --> SetFlag[Set Motion Flag]
+        SetFlag --> Delay
+        Delay --> WindowDone{Window Done?}
+        WindowDone -- No --> ReadGPIO
+        WindowDone -- Yes --> MotionFlag{Motion Flag?}
+        MotionFlag -- Yes --> IncPIR[++PIR Count\nReset Tracker]
+        MotionFlag -- No --> IncTracker[++Tracker]
         IncTracker --> CheckPeriod{Tracker >= Period?}
-        CheckPeriod -- Yes --> IncInactive[++Inactive]
-        IncInactive --> ResetTracker
-        CheckPeriod -- No --> Delay[1s Delay]
-        ResetTracker --> Delay
-        Delay --> ReadGPIO
+        CheckPeriod -- Yes --> IncInactive[++Inactive\nReset Tracker]
+        CheckPeriod -- No --> ResetFlag[Reset Motion Flag]
+        IncPIR --> ResetFlag
+        IncInactive --> ResetFlag
+        ResetFlag --> StartWindow
     end
     
     %% Main Program Flow - After ULP or power on

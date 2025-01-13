@@ -1,50 +1,73 @@
 #include "ULPManager.h"
 
+#define LED_PIN GPIO_NUM_13
+#define LED_GPIO_INDEX 13
+
 // ULP program to monitor PIR trigger (GPIO3) for LOW state with optimized delay
 const ulp_insn_t ulp_program[] = {
-    // Load addresses into registers we'll use throughout the program
-    I_MOVI(R2, PIR_COUNT),          // R2 = PIR count address
-    I_MOVI(R3, INACTIVITY_TRACKER), // R3 = Inactivity tracker address
+    // Initialize registers
+    I_MOVI(R2, PIR_COUNT), // R2 = PIR count address (preserve)
+    I_MOVI(R3, 1),         // Initialize motion flag in R3 (1 = no motion detected yet)
 
+    // Start of 1-second window
     M_LABEL(1),
-    I_DELAY(438), // debounce 25µs
+    I_MOVI(R1, 40000),                                                                                         // Load sampling iteration count
+    I_WR_REG(RTC_GPIO_OUT_REG, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, 0), // LED off at start
 
-    // Read GPIO3 state into R0
+    // Sampling loop
+    M_LABEL(2),
     I_RD_REG(RTC_GPIO_IN_REG, 3 + RTC_GPIO_IN_NEXT_S, 3 + RTC_GPIO_IN_NEXT_S),
+    M_BG(3, 0),    // If GPIO HIGH (no motion), continue to delay
+    I_MOVI(R3, 0), // Set motion flag (0 = motion detected)
 
-    // If GPIO is not LOW (no motion), skip PIR increment and tracker reset
-    M_BG(2, 0),        // If R0 > 0 (HIGH), branch to label 2
-    I_LD(R0, R2, 0),   // Load current PIR count
-    I_ADDI(R0, R0, 1), // Increment PIR count
-    I_ST(R0, R2, 0),   // Store updated PIR count
-    I_MOVI(R0, 0),     // Reset inactivity tracker
-    I_ST(R0, R3, 0),   // Store reset tracker
-    M_BX(3),           // Jump to delay section
+    // Delay and loop control
+    M_LABEL(3),
+    I_DELAY(415),      // ~25µs delay
+    I_SUBI(R1, R1, 1), // Decrement iteration counter
+    I_MOVR(R0, R1),    // Move counter to R0 for comparison
+    M_BE(4, 0),        // If counter = 0, sampling window complete
+    I_MOVR(R0, R3),    // Move motion flag to R0 for final processing
+    M_BE(2, 1),        // If no motion detected yet (R3 = 1), continue sampling
+    M_BX(3),           // Motion already detected, just continue delay
+
+    // 1-second window complete - process results
+    M_LABEL(4),
+    I_MOVR(R0, R3), // Move motion flag to R0 for final processing
+    M_BE(5, 0),     // If motion detected (R0 = 0), increment PIR count
+    M_BX(6),        // Otherwise handle inactivity tracking
+
+    // Increment PIR count
+    M_LABEL(5),
+    I_LD(R1, R2, 0),   // Load current PIR count
+    I_ADDI(R1, R1, 1), // Increment count
+    I_ST(R1, R2, 0),   // Store updated count
+    M_BX(7),           // Reset tracker, start next window
 
     // Handle inactivity tracking
-    M_LABEL(2),
-    I_LD(R0, R3, 0),               // Load current tracker value
-    I_ADDI(R0, R0, 1),             // Increment tracker
-    I_ST(R0, R3, 0),               // Store updated tracker
-    I_MOVI(R1, INACTIVITY_PERIOD), // Load period address
-    I_LD(R1, R1, 0),               // Load period value
-    M_BL(3, 1),                    // If tracker < period, skip to delay
-    I_MOVI(R1, INACTIVITY_COUNT),  // Load count address
-    I_LD(R0, R1, 0),               // Load current count
-    I_ADDI(R0, R0, 1),             // Increment count
-    I_ST(R0, R1, 0),               // Store updated count
-    I_MOVI(R0, 0),                 // Reset tracker
-    I_ST(R0, R3, 0),               // Store reset tracker
+    M_LABEL(6),
+    I_MOVI(R1, INACTIVITY_TRACKER), // Use R1 for tracker address
+    I_LD(R0, R1, 0),                // Load current tracker value
+    I_ADDI(R0, R0, 1),              // Increment tracker
+    I_ST(R0, R1, 0),                // Store updated tracker
+    I_MOVI(R1, INACTIVITY_PERIOD),  // Load period address
+    I_LD(R1, R1, 0),                // Load period value into R1
+    I_SUBR(R0, R1, R0),             // R0 =  period - tracker
+    M_BG(7, 1),                     // If (period - tracker) > 0, start next window; else increment INACTIVITY_COUNT
 
-    // 1-second delay section
-    M_LABEL(3),
-    I_MOVI(R1, 270),   // Load iteration count into R1, 270 x 0xFFFF = 1s
-    M_LABEL(4),        // Start of delay loop
-    I_DELAY(0xFFFF),   // Maximum delay
-    I_SUBI(R1, R1, 1), // Decrement counter in R1
-    I_MOVR(R0, R1),    // Move R1 to R0 for comparison
-    M_BG(4, 0),        // If R0 > 0 (R1 > 0), branch to delay loop
-    M_BX(1),           // Jump back to main loop
+    // Increment INACTIVITY_COUNT then reset tracker
+    I_MOVI(R1, INACTIVITY_COUNT),                                                                              // Load count address
+    I_LD(R0, R1, 0),                                                                                           // Load current INACTIVITY_COUNT
+    I_ADDI(R0, R0, 1),                                                                                         // Increment INACTIVITY_COUNT
+    I_ST(R0, R1, 0),                                                                                           // Store updated INACTIVITY_COUNT
+    I_WR_REG(RTC_GPIO_OUT_REG, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, 1), // LED off at start
+
+    // Start next window
+    M_LABEL(7),
+    I_MOVI(R0, 0),                  // Set R0 to 0
+    I_MOVI(R1, INACTIVITY_TRACKER), // Put INACTIVITY_TRACKER into R1
+    I_ST(R0, R1, 0),                // Store/reset tracker
+    I_MOVI(R3, 1),                  // Reset motion flag for next window
+    M_BX(1),                        // Jump back to start of 1-second window
 };
 
 ULPManager::ULPManager()
@@ -91,23 +114,6 @@ void ULPManager::start()
         Serial.printf("  ULP: program load error: %d\n", err);
         return;
     }
-
-    // Stop timer first to ensure clean state
-    // ulp_timer_stop();
-    // Serial.println("  ULP: timer stopped");
-
-    // // Set wakeup period - using period_index 0
-    // err = ulp_set_wakeup_period(0, ULP_TIMER_PERIOD);
-    // Serial.printf("  ULP: timer period set result: %d (ESP_OK=%d)\n", err, ESP_OK);
-    // if (err != ESP_OK)
-    // {
-    //     Serial.printf("  ULP: timer period set error: %d\n", err);
-    //     return;
-    // }
-
-    // // Resume timer before starting program
-    // ulp_timer_resume();
-    // Serial.println("  ULP: timer resumed");
 
     err = ulp_run(PROG_START);
     if (err != ESP_OK)

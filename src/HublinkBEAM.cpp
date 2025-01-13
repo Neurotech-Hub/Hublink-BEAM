@@ -64,7 +64,9 @@ bool HublinkBEAM::begin()
     if (!_isWakeFromSleep)
     {
         _ulp.clearPIRCount();
+        _ulp.clearInactivityCounters();
         _pir_percent_active = 0.0;
+        _inactivity_fraction = 0.0;
         alarm_interval = 0;
         alarm_start_time = 0;
 
@@ -95,7 +97,7 @@ bool HublinkBEAM::begin()
         // Calculate percentage (bound between 0-1)
         // Each PIR count represents ULP_TIMER_PERIOD of active time
         // Use double for intermediate calculations to maintain precision
-        double active_seconds = static_cast<double>(pir_count) * (ULP_TIMER_PERIOD / 1000000.0);
+        double active_seconds = static_cast<double>(pir_count) * 1.0; // we are using 1 second windows
         _pir_percent_active = (elapsed_seconds > 0) ? std::min(1.0, active_seconds / static_cast<double>(elapsed_seconds)) : 0.0;
 
         // Calculate inactivity fraction if period is set
@@ -347,124 +349,104 @@ String HublinkBEAM::getCurrentFilename()
     Serial.printf("  Wake from sleep: %s\n", _isWakeFromSleep ? "YES" : "NO");
     Serial.printf("  newFileOnBoot: %s\n", getNewFileOnBoot() ? "YES" : "NO");
 
-    // If newFileOnBoot is true, always create a new file
-    if (getNewFileOnBoot())
-    {
-        Serial.println("  newFileOnBoot is true, creating new file");
-    }
-    // If newFileOnBoot is false, try to use existing file from today
-    else
-    {
-        _preferences.begin(PREFS_NAMESPACE, false);
-        String storedFilename = _preferences.getString("filename", "");
-        _preferences.end();
+    // First check stored filename from preferences
+    _preferences.begin(PREFS_NAMESPACE, false);
+    String storedFilename = _preferences.getString("filename", "");
+    _preferences.end();
 
-        // If we have a stored filename, check if it exists and is from today
-        if (storedFilename.length() > 0)
+    // If we have a stored filename, check if it's from today
+    if (storedFilename.length() > 0)
+    {
+        // Extract date from stored filename (format: /BEAM_YYYYMMDDXX.csv)
+        int storedYear = storedFilename.substring(6, 10).toInt();
+        int storedMonth = storedFilename.substring(10, 12).toInt();
+        int storedDay = storedFilename.substring(12, 14).toInt();
+
+        Serial.println("\nComparing dates:");
+        Serial.printf("  Stored filename: %s\n", storedFilename.c_str());
+        Serial.printf("  Stored date: %04d-%02d-%02d\n", storedYear, storedMonth, storedDay);
+        Serial.printf("  Current date: %04d-%02d-%02d\n", now.year(), now.month(), now.day());
+
+        bool isFromToday = (storedYear == now.year() &&
+                            storedMonth == now.month() &&
+                            storedDay == now.day());
+
+        // If waking from sleep and file is from today, use it
+        if (_isWakeFromSleep && isFromToday && SD.exists(storedFilename))
         {
-            // Extract date from stored filename (format: /BEAM_YYYYMMDDXX.csv)
-            int storedYear = storedFilename.substring(6, 10).toInt();
-            int storedMonth = storedFilename.substring(10, 12).toInt();
-            int storedDay = storedFilename.substring(12, 14).toInt();
-
-            Serial.println("\nComparing dates:");
-            Serial.printf("  Stored filename: %s\n", storedFilename.c_str());
-            Serial.printf("  Stored date: %04d-%02d-%02d\n", storedYear, storedMonth, storedDay);
-            Serial.printf("  Current date: %04d-%02d-%02d\n", now.year(), now.month(), now.day());
-            Serial.printf("  Year match: %s\n", storedYear == now.year() ? "YES" : "NO");
-            Serial.printf("  Month match: %s\n", storedMonth == now.month() ? "YES" : "NO");
-            Serial.printf("  Day match: %s\n", storedDay == now.day() ? "YES" : "NO");
-            Serial.printf("  File exists: %s\n", SD.exists(storedFilename) ? "YES" : "NO");
-
-            // Check if stored file is from today and exists
-            if (storedYear == now.year() &&
-                storedMonth == now.month() &&
-                storedDay == now.day())
-            {
-                if (SD.exists(storedFilename))
-                {
-                    Serial.printf("  Using existing file: %s\n", storedFilename.c_str());
-                    return storedFilename;
-                }
-                else
-                {
-                    Serial.println("  Stored file not found on SD card");
-                }
-            }
-            else
-            {
-                Serial.println("  Stored file is from a different day");
-            }
+            Serial.printf("  Using existing file (wake from sleep): %s\n", storedFilename.c_str());
+            return storedFilename;
         }
 
-        // If we get here and newFileOnBoot is false, try to find the first existing file from today
-        if (!getNewFileOnBoot())
+        // If not waking from sleep and newFileOnBoot is false, try to use today's file
+        if (!_isWakeFromSleep && !getNewFileOnBoot() && isFromToday && SD.exists(storedFilename))
         {
-            char baseFilename[11]; // YYYYMMDD (8 chars + null terminator)
-            snprintf(baseFilename, sizeof(baseFilename), "%04d%02d%02d",
-                     now.year(), now.month(), now.day());
-
-            Serial.println("  Looking for existing files from today:");
-            // Try each possible number (00-99)
-            for (uint8_t num = 0; num < 100; num++)
-            {
-                char testFilename[24]; // /BEAM_YYYYMMDDXX.csv (23 chars + null terminator)
-                snprintf(testFilename, sizeof(testFilename), "/BEAM_%s%02d.csv", baseFilename, num);
-                Serial.printf("    Testing: %s - ", testFilename);
-
-                if (SD.exists(testFilename))
-                {
-                    Serial.println("exists, using this file");
-                    // Store this filename in preferences
-                    _preferences.begin(PREFS_NAMESPACE, false);
-                    _preferences.putString("filename", String(testFilename));
-                    _preferences.end();
-                    Serial.println("  Stored in preferences");
-                    return String(testFilename);
-                }
-                Serial.println("not found");
-            }
-            Serial.println("  No existing files found from today");
+            Serial.printf("  Using existing file (same day): %s\n", storedFilename.c_str());
+            return storedFilename;
         }
     }
 
-    // If we get here, we need to create a new file
-    char baseFilename[11]; // YYYYMMDD (8 chars + null terminator)
+    // If we get here, we need to either:
+    // 1. Find first existing file from today (if !newFileOnBoot)
+    // 2. Create a new file (if newFileOnBoot or no existing file found)
+
+    // Try to find existing file from today if newFileOnBoot is false
+    if (!getNewFileOnBoot())
+    {
+        char baseFilename[11]; // YYYYMMDD (8 chars + null terminator)
+        snprintf(baseFilename, sizeof(baseFilename), "%04d%02d%02d",
+                 now.year(), now.month(), now.day());
+
+        Serial.println("  Looking for existing files from today:");
+        // Try each possible number (00-99)
+        for (uint8_t num = 0; num < 100; num++)
+        {
+            char testFilename[24]; // /BEAM_YYYYMMDDXX.csv (23 chars + null terminator)
+            snprintf(testFilename, sizeof(testFilename), "/BEAM_%s%02d.csv", baseFilename, num);
+            Serial.printf("    Testing: %s - ", testFilename);
+
+            if (SD.exists(testFilename))
+            {
+                Serial.println("exists, using this file");
+                _preferences.begin(PREFS_NAMESPACE, false);
+                _preferences.putString("filename", String(testFilename));
+                _preferences.end();
+                return String(testFilename);
+            }
+            Serial.println("not found");
+        }
+        Serial.println("  No existing files found from today");
+    }
+
+    // Create new file with next available number
+    char baseFilename[11];
     snprintf(baseFilename, sizeof(baseFilename), "%04d%02d%02d",
              now.year(), now.month(), now.day());
     Serial.printf("  Base filename: %s\n", baseFilename);
 
-    // Scan files to find the highest existing number for today
+    Serial.println("  Scanning for next available number:");
     uint8_t nextNum = 0;
-    char testFilename[24]; // /BEAM_YYYYMMDDXX.csv (23 chars + null terminator)
-
-    Serial.println("  Scanning for existing files:");
-    // Test each possible number (00-99)
     while (nextNum < 100)
     {
+        char testFilename[24];
         snprintf(testFilename, sizeof(testFilename), "/BEAM_%s%02d.csv", baseFilename, nextNum);
         Serial.printf("    Testing: %s - ", testFilename);
+
         if (!SD.exists(testFilename))
         {
             Serial.println("available");
-            break;
+            _preferences.begin(PREFS_NAMESPACE, false);
+            _preferences.putString("filename", String(testFilename));
+            _preferences.end();
+            Serial.println("  Stored in preferences");
+            return String(testFilename);
         }
         Serial.println("exists");
         nextNum++;
     }
 
-    // Create final filename with the next available number
-    char filename[24]; // /BEAM_YYYYMMDDXX.csv (23 chars + null terminator)
-    snprintf(filename, sizeof(filename), "/BEAM_%s%02d.csv", baseFilename, nextNum);
-    Serial.printf("  New filename: %s\n", filename);
-
-    // Store the new filename in preferences immediately
-    _preferences.begin(PREFS_NAMESPACE, false); // read-write mode
-    _preferences.putString("filename", String(filename));
-    _preferences.end();
-    Serial.println("  Stored in preferences");
-
-    return String(filename);
+    Serial.println("Error: No available file numbers!");
+    return String();
 }
 
 bool HublinkBEAM::createFile(String filename)
@@ -581,7 +563,27 @@ bool HublinkBEAM::logData()
     bool success = dataFile.println(dataString);
     dataFile.close();
 
-    Serial.println(currentFile + ": " + dataString);
+    // Print formatted values using the same variables
+    char datetime[20];
+    snprintf(datetime, sizeof(datetime), "%04d-%02d-%02d %02d:%02d:%02d",
+             now.year(), now.month(), now.day(),
+             now.hour(), now.minute(), now.second());
+
+    Serial.println("\n" + currentFile + ":");
+    Serial.println("DateTime:    " + String(datetime));
+    Serial.println("Millis:      " + String(millis()));
+    Serial.println("Battery V:   " + String(batteryV));
+    Serial.println("Temp °C:     " + String(tempC));
+    Serial.println("Press hPa:   " + String(pressHpa));
+    Serial.println("Humidity %:  " + String(humidity));
+    Serial.println("Light lux:   " + String(lux));
+    Serial.println("PIR Count:   " + String(pirCount));
+    Serial.println("PIR Active:  " + String(_pir_percent_active));
+    Serial.println("Inact Sec:   " + String(_inactivityPeriod));
+    Serial.println("Inact Count: " + String(inactivityCount));
+    Serial.println("Inact Frac:  " + String(_inactivity_fraction));
+    Serial.println("Min Heap:    " + String(_minFreeHeap));
+    Serial.println("Is Reboot:   " + String(!_isWakeFromSleep));
 
     if (success)
     {
