@@ -41,7 +41,7 @@ const ulp_insn_t ulp_program[] = {
     I_LD(R1, R2, 0),   // Load current PIR count
     I_ADDI(R1, R1, 1), // Increment count
     I_ST(R1, R2, 0),   // Store updated count
-    M_BX(7),           // Reset tracker, start next window
+    M_BX(8),           // Reset tracker, start next window
 
     // Handle inactivity tracking
     M_LABEL(6),
@@ -52,7 +52,7 @@ const ulp_insn_t ulp_program[] = {
     I_MOVI(R1, INACTIVITY_PERIOD),  // Load period address
     I_LD(R1, R1, 0),                // Load period value into R1
     I_SUBR(R0, R1, R0),             // R0 =  period - tracker
-    M_BG(7, 1),                     // If (period - tracker) > 0, start next window; else increment INACTIVITY_COUNT
+    M_BG(9, 1),                     // If (period - tracker) > 1, start next window; else increment INACTIVITY_COUNT
 
     // Increment INACTIVITY_COUNT then reset tracker
     I_MOVI(R1, INACTIVITY_COUNT),                                                                              // Load count address
@@ -61,13 +61,15 @@ const ulp_insn_t ulp_program[] = {
     I_ST(R0, R1, 0),                                                                                           // Store updated INACTIVITY_COUNT
     I_WR_REG(RTC_GPIO_OUT_REG, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, 1), // LED off at start
 
-    // Start next window
-    M_LABEL(7),
+    // Reset tracker
+    M_LABEL(8),
     I_MOVI(R0, 0),                  // Set R0 to 0
     I_MOVI(R1, INACTIVITY_TRACKER), // Put INACTIVITY_TRACKER into R1
     I_ST(R0, R1, 0),                // Store/reset tracker
-    I_MOVI(R3, 1),                  // Reset motion flag for next window
-    M_BX(1),                        // Jump back to start of 1-second window
+
+    M_LABEL(9),
+    I_MOVI(R3, 1), // Reset motion flag for next window
+    M_BX(1),       // Jump back to start of 1-second window
 };
 
 ULPManager::ULPManager()

@@ -93,6 +93,7 @@ bool HublinkBEAM::begin()
         uint32_t current_time = getUnixTime();
         uint32_t elapsed_seconds = current_time - sleep_start_time;
         uint16_t pir_count = _ulp.getPIRCount();
+        uint16_t inactivity_tracker = _ulp.getInactivityTracker();
 
         // Calculate percentage (bound between 0-1)
         // Each PIR count represents ULP_TIMER_PERIOD of active time
@@ -104,7 +105,7 @@ bool HublinkBEAM::begin()
         _inactivity_fraction = 0.0;
         if (_inactivityPeriod > 0)
         {
-            uint16_t inactivity_count = _ulp.getInactivityCount();
+            int inactivity_count = _ulp.getInactivityCount();
             double possible_inactive_periods = static_cast<double>(elapsed_seconds) /
                                                static_cast<double>(_inactivityPeriod);
             if (possible_inactive_periods > 0)
