@@ -35,10 +35,10 @@ flowchart TB
         Delay --> WindowDone{Window Done?}
         WindowDone -- No --> ReadGPIO
         WindowDone -- Yes --> MotionFlag{Motion Flag?}
-        MotionFlag -- Yes --> IncPIR[++PIR Count\nReset Tracker]
+        MotionFlag -- Yes --> IncPIR[Increment PIR Count Reset Tracker]
         MotionFlag -- No --> IncTracker[++Tracker]
         IncTracker --> CheckPeriod{Tracker >= Period?}
-        CheckPeriod -- Yes --> IncInactive[++Inactive\nReset Tracker]
+        CheckPeriod -- Yes --> IncInactive[Increment Inactive Reset Tracker]
         CheckPeriod -- No --> ResetFlag[Reset Motion Flag]
         IncPIR --> ResetFlag
         IncInactive --> ResetFlag
