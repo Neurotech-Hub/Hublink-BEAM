@@ -20,33 +20,31 @@ flowchart TD
     %% Main flow
     Start([Start getCurrentFilename])
     A{Stored filename exists?}
-    B{Wake from sleep?}
-    C{File from today?}
-    D{newFileOnBoot?}
+    B{File from today?}
+    C{Wake from sleep OR\nNOT newFileOnBoot?}
+    D{File exists?}
     E{newFileOnBoot?}
-    F{Any files from today?}
+    F{Find first existing\nfile from today}
     UseStored[Use stored filename]
-    UseFirst[Use first existing file]
-    ScanNew[Scan for next available number]
+    CreateNew[Create new file with\nnext available number]
     End([Return filename])
 
     %% Connections
     Start --> A
-    A -->|No| D
+    A -->|No| E
     A -->|Yes| B
-    B -->|Yes| C
     B -->|No| E
-    C -->|Yes| UseStored
-    C -->|No| D
-    E -->|Yes| D
-    E -->|No| C
-    D -->|Yes| ScanNew
-    D -->|No| F
-    F -->|Yes| UseFirst
-    F -->|No| ScanNew
+    B -->|Yes| C
+    C -->|Yes| D
+    C -->|No| E
+    D -->|Yes| UseStored
+    D -->|No| E
+    E -->|Yes| CreateNew
+    E -->|No| F
+    F -->|Found| UseStored
+    F -->|Not Found| CreateNew
     UseStored --> End
-    UseFirst --> End
-    ScanNew --> End
+    CreateNew --> End
 
     %% Styling
     classDef default fill:#2d3436,stroke:#00cec9,stroke-width:2px,color:#fff
@@ -56,8 +54,9 @@ flowchart TD
     classDef endNode fill:#2d3436,stroke:#fd79a8,stroke-width:3px,color:#fff
 
     %% Apply classes
-    class A,B,C,D,E,F decision
-    class UseStored,UseFirst,ScanNew process
+    class A,B,C,D,E decision
+    class F decision
+    class UseStored,CreateNew process
     class Start start
     class End endNode
 ``` 
