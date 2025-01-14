@@ -21,12 +21,12 @@ flowchart TD
     Start([Start getCurrentFilename])
     A{Stored filename exists?}
     B{File from today?}
-    C{Wake from sleep OR\nNOT newFileOnBoot?}
+    C{Wake from sleep OR NOT newFileOnBoot?}
     D{File exists?}
     E{newFileOnBoot?}
-    F{Find first existing\nfile from today}
+    F{Find first existing file from today}
     UseStored[Use stored filename]
-    CreateNew[Create new file with\nnext available number]
+    CreateNew[Create new file with next available number]
     End([Return filename])
 
     %% Connections
