@@ -11,8 +11,8 @@ const ulp_insn_t ulp_program[] = {
 
     // Start of 1-second window
     M_LABEL(1),
-    I_MOVI(R1, 40000),                                                                                         // Load sampling iteration count
-    I_WR_REG(RTC_GPIO_OUT_REG, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, 0), // LED off at start
+    I_MOVI(R1, 40000), // Load sampling iteration count
+    // I_WR_REG(RTC_GPIO_OUT_REG, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, 0), // LED off at start
 
     // Sampling loop
     M_LABEL(2),
@@ -55,11 +55,11 @@ const ulp_insn_t ulp_program[] = {
     M_BG(9, 1),                     // If (period - tracker) > 1, start next window; else increment INACTIVITY_COUNT
 
     // Increment INACTIVITY_COUNT then reset tracker
-    I_MOVI(R1, INACTIVITY_COUNT),                                                                              // Load count address
-    I_LD(R0, R1, 0),                                                                                           // Load current INACTIVITY_COUNT
-    I_ADDI(R0, R0, 1),                                                                                         // Increment INACTIVITY_COUNT
-    I_ST(R0, R1, 0),                                                                                           // Store updated INACTIVITY_COUNT
-    I_WR_REG(RTC_GPIO_OUT_REG, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, 1), // LED off at start
+    I_MOVI(R1, INACTIVITY_COUNT), // Load count address
+    I_LD(R0, R1, 0),              // Load current INACTIVITY_COUNT
+    I_ADDI(R0, R0, 1),            // Increment INACTIVITY_COUNT
+    I_ST(R0, R1, 0),              // Store updated INACTIVITY_COUNT
+    // I_WR_REG(RTC_GPIO_OUT_REG, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, 1), // LED off at start
 
     // Reset tracker
     M_LABEL(8),
