@@ -23,8 +23,15 @@ class DateTime;
 // Pin Definitions
 #define PIN_SD_CS 12    // SD card chip select
 #define PIN_SD_DET 11   // SD card detection pin
-#define PIN_GREEN_LED 5 // On-board green LED
-#define NEOPIXEL_DIM 3
+#define PIN_FRONT_LED 9 // On-board green LED
+// switches are HIGH (INPUT_PULLUP/open) when UP (toward the A/B markers)
+// switches are LOW (shunted to gnd/closed) when DOWN (away from the A/B markers)
+// deploy to production in UP position for minimal current draw
+#define PIN_SWITCH_A 6   // Switch A
+#define PIN_SWITCH_B 5   // Switch B
+#define PIN_SD_PWR_EN 10 // SD card VDD LDO enable
+#define TP_1 8
+#define TP_2 15
 
 // NeoPixel Colors
 #define NEOPIXEL_OFF 0x000000
@@ -32,6 +39,7 @@ class DateTime;
 #define NEOPIXEL_GREEN 0x00FF00
 #define NEOPIXEL_BLUE 0x0000FF
 #define NEOPIXEL_PURPLE 0x800080
+#define NEOPIXEL_DIM 3
 
 // Environmental constants
 #define SEALEVELPRESSURE_HPA (1013.25)
@@ -103,8 +111,9 @@ private:
     String getCurrentFilename();      // Gets filename in YYYYMMDD.csv format
     bool createFile(String filename); // Creates new file with header
     bool isSDCardPresent();           // Checks if SD card is inserted
-    bool isWakeFromDeepSleep();       // Check if we're waking from deep sleep
-
+    void enableSDPower();
+    void disableSDPower();
+    bool doDebug();
     bool _isLowBattery;
     bool _isWakeFromSleep;          // Track wake state
     bool _newFileOnBoot = true;     // Controls whether to create new file on each boot

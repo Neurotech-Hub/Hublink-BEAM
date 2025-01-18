@@ -22,7 +22,12 @@ HublinkBEAM::HublinkBEAM() : _pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800)
 
 bool HublinkBEAM::begin()
 {
-    Serial.printf("\nHeap - begin() start: %lu bytes\n", ESP.getFreeHeap());
+    Serial.begin(115200);
+    if (doDebug())
+    {
+        delay(2000);
+        Serial.println("Debug mode enabled");
+    }
     // Stop ULP to free up GPIO pins and stop ULP timer
     _ulp.stop();
 
@@ -63,6 +68,7 @@ bool HublinkBEAM::begin()
     // Only print full initialization report on first boot
     if (!_isWakeFromSleep)
     {
+        digitalWrite(PIN_FRONT_LED, HIGH);
         _ulp.clearPIRCount();
         _ulp.clearInactivityCounters();
         _pir_percent_active = 0.0;
@@ -130,6 +136,7 @@ bool HublinkBEAM::begin()
     if (allInitialized)
     {
         disableNeoPixel(); // Turn off if everything is OK
+        digitalWrite(PIN_FRONT_LED, LOW);
     }
     else
     {
@@ -155,16 +162,23 @@ void HublinkBEAM::initPins()
 
     // Initialize SD card pins
     pinMode(PIN_SD_CS, OUTPUT);
-    digitalWrite(PIN_SD_CS, HIGH); // Deselect SD card by default
-    pinMode(PIN_SD_DET, INPUT_PULLUP);
+    digitalWrite(PIN_SD_CS, HIGH);     // Deselect SD card by default
+    pinMode(PIN_SD_DET, INPUT_PULLUP); // converts to input during sleep
+    pinMode(PIN_SD_PWR_EN, OUTPUT);
+    enableSDPower();
 
     // Initialize on-board LED
-    pinMode(PIN_GREEN_LED, OUTPUT);
-    digitalWrite(PIN_GREEN_LED, LOW); // Turn off green LED
+    pinMode(PIN_FRONT_LED, OUTPUT);
+    digitalWrite(PIN_FRONT_LED, LOW); // Turn off green LED
 
     // Initialize and hold (during deep sleep) I2C power control
     pinMode(PIN_I2C_POWER, OUTPUT);
     digitalWrite(PIN_I2C_POWER, HIGH);
+
+    pinMode(PIN_SWITCH_A, INPUT_PULLUP);
+    pinMode(PIN_SWITCH_B, INPUT_PULLUP);
+    pinMode(TP_1, INPUT_PULLUP);
+    pinMode(TP_2, INPUT_PULLUP);
 
     // Initialize NeoPixel power pin and pixel
     pinMode(NEOPIXEL_POWER, OUTPUT);
@@ -176,7 +190,6 @@ void HublinkBEAM::initPins()
 
 bool HublinkBEAM::initSensors(bool isWakeFromSleep)
 {
-    Serial.printf("\nHeap - before sensor init: %lu bytes\n", ESP.getFreeHeap());
     bool allInitialized = true;
     Serial.println("Initializing sensors...");
 
@@ -287,7 +300,14 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
             {
                 Serial.println("  PIR: using delay (USB connected)");
                 setNeoPixel(NEOPIXEL_PURPLE);
-                delay(ZDP323_TSTAB_MS);
+                if (doDebug())
+                {
+                    delay(3000); // shortened for debugging
+                }
+                else
+                {
+                    delay(ZDP323_TSTAB_MS);
+                }
             }
             else
             {
@@ -301,7 +321,6 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
     }
 
     Serial.printf("  All sensors %s\n", allInitialized ? "OK" : "FAILED");
-    Serial.printf("Heap - after sensor init: %lu bytes\n", ESP.getFreeHeap());
     return allInitialized;
 }
 
@@ -341,6 +360,21 @@ bool HublinkBEAM::initSD()
 bool HublinkBEAM::isSDCardPresent()
 {
     return !digitalRead(PIN_SD_DET); // Pin is pulled up, so LOW means card is present
+}
+
+void HublinkBEAM::enableSDPower()
+{
+    digitalWrite(PIN_SD_PWR_EN, HIGH);
+}
+
+void HublinkBEAM::disableSDPower()
+{
+    digitalWrite(PIN_SD_PWR_EN, LOW);
+}
+
+bool HublinkBEAM::doDebug()
+{
+    return digitalRead(PIN_SWITCH_A) == LOW;
 }
 
 String HublinkBEAM::getCurrentFilename()
@@ -480,6 +514,11 @@ bool HublinkBEAM::createFile(String filename)
 
 bool HublinkBEAM::logData()
 {
+    if (doDebug())
+    {
+        delay(2000);
+    }
+
     uint16_t pirCount = _ulp.getPIRCount(); // clear in sleep()
     uint16_t inactivityCount = (_inactivityPeriod > 0) ? _ulp.getInactivityCount() : 0;
     _minFreeHeap = ESP.getMinFreeHeap(); // Get minimum free heap since boot
@@ -621,7 +660,7 @@ void HublinkBEAM::sleep(uint32_t minutes)
     // Prepare for sleep
     disableNeoPixel();
     digitalWrite(LED_BUILTIN, LOW);
-    digitalWrite(PIN_GREEN_LED, LOW);
+    digitalWrite(PIN_FRONT_LED, LOW);
     pinMode(PIN_SD_DET, INPUT);
 
     // Prepare sensors for sleep
@@ -636,7 +675,6 @@ void HublinkBEAM::sleep(uint32_t minutes)
         _batteryMonitor.sleep(true);       // Enter sleep mode
     }
 
-    Serial.printf("\nHeap - before deep sleep: %lu bytes\n", ESP.getFreeHeap());
     Serial.printf("Entering deep sleep for %d minutes (%d seconds)\n", minutes, seconds);
     Serial.flush();
 
