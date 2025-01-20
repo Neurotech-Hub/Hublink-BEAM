@@ -21,13 +21,16 @@ bool RTCManager::begin()
         return false;
     }
 
-    if (isNewCompilation())
+    // Only check for new compilation on hard reset
+    esp_reset_reason_t reset_reason = esp_reset_reason();
+    bool isWakeFromSleep = (reset_reason == ESP_SLEEP_WAKEUP_TIMER);
+
+    if (!isWakeFromSleep && isNewCompilation())
     {
         updateRTC();
         updateCompilationID();
     }
-
-    if (_rtc.lostPower())
+    else if (_rtc.lostPower())
     {
         Serial.println("RTC lost power, updating time from compilation");
         updateRTC();
@@ -87,50 +90,96 @@ DateTime RTCManager::getFutureTime(int days, int hours, int minutes, int seconds
 
 String RTCManager::getCompileDateTime()
 {
-    const char *date = __DATE__;
-    const char *time = __TIME__;
-    char compileDateTime[20];
-    // Convert compile date/time to string
-    snprintf(compileDateTime, sizeof(compileDateTime), "%s %s", date, time);
+    // Use compiler macros for build time
+    const char *compileDate = __DATE__; // Format: "Mmm dd yyyy"
+    const char *compileTime = __TIME__; // Format: "hh:mm:ss"
+
+    // Parse date components
+    char month[4];
+    int day, year;
+    sscanf(compileDate, "%s %d %d", month, &day, &year);
+
+    // Convert month string to number
+    int monthNum = 1;
+    const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    for (int i = 0; i < 12; i++)
+    {
+        if (strncmp(month, months[i], 3) == 0)
+        {
+            monthNum = i + 1;
+            break;
+        }
+    }
+
+    // Parse time components
+    int hour, minute, second;
+    sscanf(compileTime, "%d:%d:%d", &hour, &minute, &second);
+
+    char compileDateTime[32];
+    // Format with just the compile date and time
+    snprintf(compileDateTime, sizeof(compileDateTime),
+             "%04d-%02d-%02d %02d:%02d:%02d",
+             year, monthNum, day,
+             hour, minute, second);
+
     return String(compileDateTime);
 }
 
 DateTime RTCManager::getCompensatedDateTime()
 {
-    // Parse __DATE__ and __TIME__ strings
-    char monthStr[4];
-    int month, day, year, hour, minute, second;
-    static const char month_names[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
+    // Parse the compile time directly
+    const char *compileDate = __DATE__; // Format: "Mmm dd yyyy"
+    const char *compileTime = __TIME__; // Format: "hh:mm:ss"
 
-    // Parse date string
-    sscanf(__DATE__, "%s %d %d", monthStr, &day, &year);
-    month = (strstr(month_names, monthStr) - month_names) / 3 + 1;
+    // Parse date components
+    char month[4];
+    int day, year;
+    sscanf(compileDate, "%s %d %d", month, &day, &year);
 
-    // Parse time string
-    sscanf(__TIME__, "%d:%d:%d", &hour, &minute, &second);
+    // Convert month string to number
+    int monthNum = 1;
+    const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    for (int i = 0; i < 12; i++)
+    {
+        if (strncmp(month, months[i], 3) == 0)
+        {
+            monthNum = i + 1;
+            break;
+        }
+    }
 
-    // Create DateTime object for compilation time
-    DateTime compileTime(year, month, day, hour, minute, second);
+    // Parse time components
+    int hour, minute, second;
+    sscanf(compileTime, "%d:%d:%d", &hour, &minute, &second);
+
+    // Create DateTime object from compile time
+    DateTime compileDateTime(year, monthNum, day, hour, minute, second);
 
     // Add upload delay compensation
-    return compileTime + TimeSpan(0, 0, 0, UPLOAD_DELAY_SECONDS);
+    return compileDateTime + TimeSpan(0, 0, 0, UPLOAD_DELAY_SECONDS);
 }
 
 bool RTCManager::isNewCompilation()
 {
     _preferences.begin(PREFS_NAMESPACE, false);
-    const String currentCompileTime = getCompileDateTime();
-    String storedCompileTime = _preferences.getString("compileTime", "");
+    const String currentBuildTime = getCompileDateTime();
+    String storedBuildTime = _preferences.getString("buildTime", "");
 
-    Serial.println("\nChecking compilation status:");
+    // Store new build time
+    if (currentBuildTime != storedBuildTime)
+    {
+        _preferences.putString("buildTime", currentBuildTime);
+    }
+    _preferences.end();
+
+    Serial.println("\nChecking build status:");
     Serial.println("---------------------------");
-    Serial.println("Current compile time: " + currentCompileTime);
-    Serial.println("Stored compile time:  " + storedCompileTime);
-    Serial.println("Is new compilation:   " + String(currentCompileTime != storedCompileTime));
+    Serial.println("Current build ID:  " + currentBuildTime);
+    Serial.println("Previous build ID: " + storedBuildTime);
+    Serial.println("Is new upload:     " + String(currentBuildTime != storedBuildTime));
     Serial.println("---------------------------\n");
 
-    _preferences.end();
-    return currentCompileTime != storedCompileTime;
+    return currentBuildTime != storedBuildTime;
 }
 
 void RTCManager::updateCompilationID()

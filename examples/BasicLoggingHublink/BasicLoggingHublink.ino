@@ -11,7 +11,7 @@ void setup()
 {
   // Configure behavior
   beam.setNewFileOnBoot(false); // false to continue using same file if it's the same day
-  beam.setInactivityPeriod(10); // 40 seconds; based on https://shorturl.at/JiZxK
+  beam.setInactivityPeriod(40); // 40 seconds; based on https://shorturl.at/JiZxK
 
   // Wait for the beam to initialize, retry (likely due to SD card ejecting)
   while (!beam.begin())

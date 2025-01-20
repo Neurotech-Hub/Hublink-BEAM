@@ -25,7 +25,12 @@ bool HublinkBEAM::begin()
     Serial.begin(115200);
     if (doDebug())
     {
-        delay(2000);
+        // Wait up to 10 seconds for Serial connection
+        unsigned long startTime = millis();
+        while (!Serial && (millis() - startTime < 10000))
+        {
+            delay(100); // Small delay to prevent tight loop
+        }
         Serial.println("Debug mode enabled");
     }
     // Stop ULP to free up GPIO pins and stop ULP timer
@@ -171,10 +176,7 @@ void HublinkBEAM::initPins()
     pinMode(PIN_FRONT_LED, OUTPUT);
     digitalWrite(PIN_FRONT_LED, LOW); // Turn off green LED
 
-    // Initialize and hold (during deep sleep) I2C power control
-    pinMode(PIN_I2C_POWER, OUTPUT);
-    digitalWrite(PIN_I2C_POWER, HIGH);
-
+    // on board GPIO
     pinMode(PIN_SWITCH_A, INPUT_PULLUP);
     pinMode(PIN_SWITCH_B, INPUT_PULLUP);
     pinMode(TP_1, INPUT_PULLUP);
@@ -186,6 +188,9 @@ void HublinkBEAM::initPins()
     _pixel.begin();
     _pixel.setBrightness(NEOPIXEL_DIM); // Set to low brightness
     _pixel.show();                      // Initialize all pixels to 'off'
+
+    // turn off I2C power for Adafruit ESP32-S3 Feather (uses hardware pulldown)
+    pinMode(PIN_I2C_POWER, INPUT);
 }
 
 bool HublinkBEAM::initSensors(bool isWakeFromSleep)
@@ -662,6 +667,12 @@ void HublinkBEAM::sleep(uint32_t minutes)
     digitalWrite(LED_BUILTIN, LOW);
     digitalWrite(PIN_FRONT_LED, LOW);
     pinMode(PIN_SD_DET, INPUT);
+    SD.end();                  // 1: end SD
+    disableSDPower();          // 2: disable SD power
+    pinMode(PIN_SD_CS, INPUT); // 3: avoid current leakage
+    pinMode(MOSI, INPUT);
+    pinMode(MISO, INPUT);
+    pinMode(SCK, INPUT);
 
     // Prepare sensors for sleep
     if (_isPIRInitialized)

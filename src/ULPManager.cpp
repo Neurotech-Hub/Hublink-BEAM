@@ -80,13 +80,8 @@ ULPManager::ULPManager()
 void ULPManager::begin()
 {
     Serial.println("  ULP: begin");
-    // Configure I2C power pin
-    rtc_gpio_init((gpio_num_t)PIN_I2C_POWER);
-    rtc_gpio_set_direction((gpio_num_t)PIN_I2C_POWER, RTC_GPIO_MODE_OUTPUT_ONLY);
-    rtc_gpio_set_level((gpio_num_t)PIN_I2C_POWER, 1);
-    rtc_gpio_hold_en((gpio_num_t)PIN_I2C_POWER);
 
-    // Configure LED pin
+    // Configure LED pin for debugging
     rtc_gpio_init((gpio_num_t)LED_BUILTIN);
     rtc_gpio_set_direction((gpio_num_t)LED_BUILTIN, RTC_GPIO_MODE_OUTPUT_ONLY);
 
@@ -131,7 +126,6 @@ void ULPManager::stop()
     Serial.println("  ULP: stopping program");
 
     // First disable holds
-    rtc_gpio_hold_dis((gpio_num_t)PIN_I2C_POWER);
     rtc_gpio_hold_dis(SDA_GPIO);
 
     // Reset SDA pin configuration
@@ -139,10 +133,6 @@ void ULPManager::stop()
     rtc_gpio_pullup_dis(SDA_GPIO);
     rtc_gpio_pulldown_dis(SDA_GPIO);
     rtc_gpio_deinit(SDA_GPIO);
-
-    // Reset I2C power pin configuration
-    rtc_gpio_set_direction((gpio_num_t)PIN_I2C_POWER, RTC_GPIO_MODE_DISABLED);
-    rtc_gpio_deinit((gpio_num_t)PIN_I2C_POWER);
 
     // Try to halt the ULP program
     ulp_timer_stop();
