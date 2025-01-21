@@ -8,6 +8,7 @@
 
 // Pin definitions from HublinkBEAM
 #define SDA_GPIO GPIO_NUM_3
+#define PIN_SD_PWR_EN 10 // SD card VDD LDO enable
 
 // ULP program constants
 enum
@@ -34,9 +35,9 @@ void setup()
     digitalWrite(NEOPIXEL_POWER, LOW);
 
     // Initialize and hold I2C power pin
-    pinMode(PIN_I2C_POWER, OUTPUT);
-    digitalWrite(PIN_I2C_POWER, HIGH);
-    gpio_hold_en((gpio_num_t)PIN_I2C_POWER);
+    pinMode(PIN_SD_PWR_EN, OUTPUT);
+    digitalWrite(PIN_SD_PWR_EN, LOW);
+    gpio_hold_en((gpio_num_t)PIN_SD_PWR_EN);
 
     // Clear RTC memory
     memset(RTC_SLOW_MEM, 0, CONFIG_ULP_COPROC_RESERVE_MEM);

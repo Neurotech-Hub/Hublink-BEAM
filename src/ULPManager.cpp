@@ -1,4 +1,5 @@
 #include "ULPManager.h"
+#include "HublinkBEAM.h"
 
 #define LED_PIN GPIO_NUM_13
 #define LED_GPIO_INDEX 13
@@ -85,6 +86,12 @@ void ULPManager::begin()
     rtc_gpio_init((gpio_num_t)LED_BUILTIN);
     rtc_gpio_set_direction((gpio_num_t)LED_BUILTIN, RTC_GPIO_MODE_OUTPUT_ONLY);
 
+    // Configure SD power pin
+    rtc_gpio_init((gpio_num_t)PIN_SD_PWR_EN);
+    rtc_gpio_set_direction((gpio_num_t)PIN_SD_PWR_EN, RTC_GPIO_MODE_OUTPUT_ONLY);
+    rtc_gpio_set_level((gpio_num_t)PIN_SD_PWR_EN, 0); // turn off SD power
+    rtc_gpio_hold_en((gpio_num_t)PIN_SD_PWR_EN);
+
     // Only configure SDA (GPIO3) for ULP reading
     rtc_gpio_init(SDA_GPIO);
     rtc_gpio_set_direction(SDA_GPIO, RTC_GPIO_MODE_INPUT_ONLY);
@@ -127,12 +134,16 @@ void ULPManager::stop()
 
     // First disable holds
     rtc_gpio_hold_dis(SDA_GPIO);
+    rtc_gpio_hold_dis((gpio_num_t)PIN_SD_PWR_EN);
 
     // Reset SDA pin configuration
     rtc_gpio_set_direction(SDA_GPIO, RTC_GPIO_MODE_DISABLED);
     rtc_gpio_pullup_dis(SDA_GPIO);
     rtc_gpio_pulldown_dis(SDA_GPIO);
     rtc_gpio_deinit(SDA_GPIO);
+
+    rtc_gpio_set_direction((gpio_num_t)PIN_SD_PWR_EN, RTC_GPIO_MODE_DISABLED);
+    rtc_gpio_deinit((gpio_num_t)PIN_SD_PWR_EN);
 
     // Try to halt the ULP program
     ulp_timer_stop();

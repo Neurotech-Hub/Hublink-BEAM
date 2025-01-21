@@ -22,29 +22,29 @@ HublinkBEAM::HublinkBEAM() : _pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800)
 
 bool HublinkBEAM::begin()
 {
-    Serial.begin(115200);
-    if (doDebug())
-    {
-        // Wait up to 10 seconds for Serial connection
-        unsigned long startTime = millis();
-        while (!Serial && (millis() - startTime < 10000))
-        {
-            delay(100); // Small delay to prevent tight loop
-        }
-        Serial.println("Debug mode enabled");
-    }
     // Stop ULP to free up GPIO pins and stop ULP timer
     _ulp.stop();
 
     // Set CPU frequency to 80MHz
     setCpuFrequencyMhz(80);
 
-    // Normal initialization for timer wakeup or regular boot
-    Serial.println("\n\n\n----------\nbeam.begin()...\n----------\n");
-
     // Initialize pins and set NeoPixel to blue during initialization
     initPins();
     setNeoPixel(NEOPIXEL_BLUE);
+
+    Serial.begin(115200);
+    if (doDebug())
+    {
+        // Wait up to 10 seconds for Serial connection
+        unsigned long startTime = millis();
+        while (!Serial && (millis() - startTime < 5000))
+        {
+            delay(100); // Small delay to prevent tight loop
+        }
+        Serial.println("***Debug mode enabled***");
+    }
+    // Normal initialization for timer wakeup or regular boot
+    Serial.println("\n\n\n----------\nbeam.begin()...\n----------\n");
 
     // Initialize I2C for all cases
     Wire.begin();
@@ -301,23 +301,17 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
         {
             Serial.println("  PIR: starting stabilization");
             // Use delay if USB is connected, light sleep has issues disconnecting otherwise
+            int delayTime = doDebug() ? 3000 : ZDP323_TSTAB_MS;
             if (Serial)
             {
                 Serial.println("  PIR: using delay (USB connected)");
                 setNeoPixel(NEOPIXEL_PURPLE);
-                if (doDebug())
-                {
-                    delay(3000); // shortened for debugging
-                }
-                else
-                {
-                    delay(ZDP323_TSTAB_MS);
-                }
+                delay(delayTime);
             }
             else
             {
                 Serial.println("  PIR: using light sleep");
-                esp_sleep_enable_timer_wakeup(ZDP323_TSTAB_MS * 1000); // Convert ms to microseconds
+                esp_sleep_enable_timer_wakeup(delayTime * 1000); // Convert ms to microseconds
                 esp_light_sleep_start();
                 esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
             }
