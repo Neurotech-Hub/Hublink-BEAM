@@ -15,6 +15,15 @@
 5. Inser the coin cell for the RTC.
 6. Turn the module "OFF" and ensure both switches remain "UP" (towards the A/B markers) for production deployment.
 
+### Low Power Modification
+
+The Adafruit ESP32-S3 Feather has an onboard LDO for the I2C port. It was unclear for BEAM v2.0 that the LDO's output is driven in shutdown mode; this conflicts with I2C operations and draws an additional ~1.5mA. **The feather's LDO needs to be removed** to reduce power consumption.
+
+![LDO Removal](BEAM_chip_removal.jpg)
+
+1. Apply flux and hot air (~335°C) to lift off the 5-pin chip above the A3 and A4 pins. Do not scortch the adjecent button or stemma QT connector.
+2. Clean the affected area with isopropyl alcohol.
+
 ### Quality Control
 
 1. Check all solder joints for full coverage, bridging, and balling.
