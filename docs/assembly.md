@@ -51,9 +51,11 @@ Do not proceed if any of these addresses are missing.
 3. Hold shift and click upload: this flushes any cached compilations in order to properly set the RTC.
 4. Upon successful upload you should see an initialization report. In production mode (switch A is up), there may not be a sufficient delay for the serial port to show the report: you may temporarily turn switch A down to include delays to see the report.
 
-## Hardware Assembly
+## Enclosure Assembly
 
-1. Cut 2mm hinges to length.
-2. Align the two case parts and insert the hinge to ensure it has sufficient purchase on each side of the case back hinge elements. You may need to use a hammer to gently tap it into place (from the top) using another 2mm hinge section to get it properly aligned.
+1. Cut 2mm hinges to length. Align the two case parts and insert the hinge to ensure it has sufficient purchase on each side of the case back hinge elements. You may need to use a hammer to gently tap it into place (from the top) using another 2mm hinge section to get it properly aligned.
+2. Press-fit the PIR sensor lens into the case.
+3. Screw on the aluminum front plate (two M2 x 5mm screws).
+4. Add PCB assembly to the case (four M2 x 5mm screws).
 
 Note: screw holes are self-tapping. They take light pressure to thread but will not last forever and can strip with too much force.
