@@ -3,7 +3,7 @@
 
 HublinkBEAM beam;
 Hublink hublink(PIN_SD_CS);
-const unsigned long LOG_EVERY_MINUTES = 10;   // Log every X minutes
+const unsigned long LOG_EVERY_MINUTES = 10;  // Log every X minutes
 const unsigned long SYNC_EVERY_MINUTES = 30; // Sync every X minutes
 const unsigned long SYNC_FOR_SECONDS = 30;   // Sync timeout in seconds
 
@@ -33,6 +33,9 @@ void loop()
     if (hublink.begin())
     {
       Serial.println("✓ Hublink.");
+
+      // this is a forced sync, so it will ignore some of the settings in meta.json
+      // such as: advertise_every, advertise_for, or try_reconnect
       hublink.sync(SYNC_FOR_SECONDS);
     }
     else
