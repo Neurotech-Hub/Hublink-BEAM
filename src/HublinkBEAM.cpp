@@ -101,28 +101,58 @@ bool HublinkBEAM::begin()
     }
     else
     {
-        uint32_t current_time = getUnixTime();
-        uint32_t elapsed_seconds = current_time - sleep_start_time;
-        uint16_t pir_count = _ulp.getPIRCount();
-        uint16_t inactivity_tracker = _ulp.getInactivityTracker();
+        const uint32_t current_time = getUnixTime();
+        const uint32_t elapsed_seconds = current_time - sleep_start_time;
+        const uint16_t pir_count = _ulp.getPIRCount();
 
-        // Calculate percentage (bound between 0-1)
-        // Each PIR count represents ULP_TIMER_PERIOD of active time
-        // Use double for intermediate calculations to maintain precision
-        double active_seconds = static_cast<double>(pir_count) * 1.0; // we are using 1 second windows
+        // Use consistent type for all time-based calculations
+        const double active_seconds = static_cast<double>(pir_count) * 1.0;
         _pir_percent_active = (elapsed_seconds > 0) ? std::min(1.0, active_seconds / static_cast<double>(elapsed_seconds)) : 0.0;
+
+        /*
+        Timeline Example (elapsed_seconds = 100, _inactivityPeriod = 20)
+        |----|----|----|----|----| Each "|" represents 20 seconds (inactivityPeriod)
+        0    20   40   60   80   100
+
+        Case 1: Some motion detected (pir_count = 3)
+        active_seconds = 3
+        X = motion detected
+        |-X--|--X-|----|-X--|----| (inactivity_count = 2 complete periods without motion)
+            ^         ^    ^
+            motion    motion motion
+
+        inactive_seconds = inactivity_count * _inactivityPeriod = 2 * 20 = 40
+        _inactivity_fraction = 40 / (40 + 3) ≈ 0.93 (93% inactive)
+
+        Case 2: Frequent motion (pir_count = 15)
+        X = motion detected
+        |XX--|XXXX|X-X-|XX-X|X--X|
+        inactive_seconds = inactivity_count * _inactivityPeriod = 0 * 20 = 0
+        _inactivity_fraction = 0 / (0 + 15) = 0 (0% inactive)
+
+        Case 3: No motion (pir_count = 0)
+        |----|----|----|----|----| (inactivity_count = 5)
+        inactive_seconds = inactivity_count * _inactivityPeriod = 5 * 20 = 100
+        _inactivity_fraction = 100 / (100 + 0) = 1.0 (100% inactive)
+        */
 
         // Calculate inactivity fraction if period is set
         _inactivity_fraction = 0.0;
         if (_inactivityPeriod > 0)
         {
-            int inactivity_count = _ulp.getInactivityCount();
-            double possible_inactive_periods = static_cast<double>(elapsed_seconds) /
-                                               static_cast<double>(_inactivityPeriod);
+            const uint16_t inactivity_count = _ulp.getInactivityCount();
+            const double possible_inactive_periods = static_cast<double>(elapsed_seconds) /
+                                                     static_cast<double>(_inactivityPeriod);
             if (possible_inactive_periods > 0)
             {
+                const double inactive_seconds = static_cast<double>(inactivity_count) *
+                                                static_cast<double>(_inactivityPeriod);
+                // note, inactive seconds is tallied based on _inactivityPeriod, not actual single seconds.
+                // So by including active_seconds in the denominator, we are able to calculate the fraction of time
+                // that was inactive to include the time outside of the last _inactivityPeriod; even a full
+                // _inactivityPeriod wasn't met, we still have a true fraction of time that was inactive.
                 _inactivity_fraction = std::min(1.0,
-                                                static_cast<double>(inactivity_count) / possible_inactive_periods);
+                                                inactive_seconds / (inactive_seconds + active_seconds));
             }
         }
 

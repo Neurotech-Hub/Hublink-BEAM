@@ -4,14 +4,24 @@ An Arduino library for the Hublink BEAM ESP32-S3 data logging device. This libra
 
 ## Installation
 
-1. Download this repository
-2. In the Arduino IDE, go to Sketch -> Include Library -> Add .ZIP Library
-3. Select the downloaded repository
+1. Download this repository and its dependencies: see [library.properties](library.properties) and [https://github.com/Neurotech-Hub/Hublink-Node](https://github.com/Neurotech-Hub/Hublink-Node).
+2. For downlaoded libraries, go to Sketch -> Include Library -> Add .ZIP Library, or place the library in the `libraries` folder in the Arduino IDE.
+3. Ensure the switch is in the `ON` position.
+4. If the device has been previously flashed, it may be in a deep sleep state and will not connect to the serial port. To enter boot mode, hold the `Boot` button and toggle the `Reset` button (then release the `Boot` button).
+5. If the Arduino IDE does not indicate that it is connected to "Adafruit Feather ESP32-S3 2MB PSRAM", click Tools -> Board -> esp32 -> Adafruit Feather ESP32-S3 2MB PSRAM (you will need to download the esp32 board package (by espressif) from the Arduino IDE).
 
-LED Colors:
+### Debug Mode
+You may enable debugging mode by placing the `A` switch down. This will reduce the PIR sensor initialization period and introduce delays before Serial statements so they can be read by a serial terminal. These delays are useful for debugging, but should be removed for normal operation.
+
+## Hardware Assembly
+For detailed hardware assembly instructions, including the required low-power modification, see [docs/assembly.md](docs/assembly.md).
+
+### LED Indicators
+These indicators may be temporary during operations or flash continuously if stuck in a loop.
+
 - Blue: Starting up
-- Green: Motion detected (during data logging)
 - Red: Error (SD card or sensor failure)
+- Green: Motion detected (during data logging)
 - Purple: Low battery
 - Off: Normal operation
 
@@ -39,6 +49,8 @@ Files are named in the format `/BEAM_YYYYMMDDXX.csv` where:
 - `MM`: Month (01-12)
 - `DD`: Day (01-31)
 - `XX`: Sequence number (00-99)
+
+For a detailed flowchart of the filename selection logic, see [docs/filename_logic.md](docs/filename_logic.md).
 
 The sequence number handling can be controlled with the `setNewFileOnBoot()` method:
 ```cpp
