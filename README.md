@@ -5,7 +5,7 @@ An Arduino library for the Hublink BEAM ESP32-S3 data logging device. This libra
 ## Installation
 
 1. Download this repository and its dependencies: see [library.properties](library.properties) and [https://github.com/Neurotech-Hub/Hublink-Node](https://github.com/Neurotech-Hub/Hublink-Node).
-2. For downlaoded libraries, go to Sketch -> Include Library -> Add .ZIP Library, or place the library in the `libraries` folder in the Arduino IDE.
+2. For downloaded libraries, go to Sketch -> Include Library -> Add .ZIP Library, or place the library in the `libraries` folder in the Arduino IDE.
 3. Ensure the switch is in the `ON` position.
 4. If the device has been previously flashed, it may be in a deep sleep state and will not connect to the serial port. To enter boot mode, hold the `Boot` button and toggle the `Reset` button (then release the `Boot` button).
 5. If the Arduino IDE does not indicate that it is connected to "Adafruit Feather ESP32-S3 2MB PSRAM", click Tools -> Board -> esp32 -> Adafruit Feather ESP32-S3 2MB PSRAM (you will need to download the esp32 board package (by espressif) from the Arduino IDE).
