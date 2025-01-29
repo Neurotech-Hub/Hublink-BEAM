@@ -4,8 +4,14 @@
 HublinkBEAM beam;
 Hublink hublink(PIN_SD_CS);
 const unsigned long LOG_EVERY_MINUTES = 10;   // Log every X minutes
-const unsigned long SYNC_EVERY_MINUTES = 60;  // Sync every X minutes
-const unsigned long SYNC_FOR_SECONDS = 30;    // Sync timeout in seconds
+const unsigned long SYNC_EVERY_MINUTES = 30;  // Sync every X minutes
+const unsigned long SYNC_FOR_SECONDS = 30;   // Sync timeout in seconds
+
+// Hublink callback function to handle timestamp
+void onTimestampReceived(uint32_t timestamp) {
+  Serial.println("Received timestamp: " + String(timestamp));
+  beam.adjustRTC(timestamp);
+}
 
 void setup() {
   // Configure behavior
@@ -28,6 +34,7 @@ void loop() {
     // only begin when alarm is triggered (risks not catching error at setup though)
     if (hublink.begin()) {
       Serial.println("✓ Hublink.");
+      hublink.setTimestampCallback(onTimestampReceived);
 
       // this is a forced sync, so it will ignore some of the settings in meta.json
       // such as: advertise_every, advertise_for, or try_reconnect
