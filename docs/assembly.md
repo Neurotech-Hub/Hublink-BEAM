@@ -5,9 +5,9 @@
 1. Solder Adafruit ESP32-S3 Feather to the board.
 2. Insert a PIR sensor standoff (printed in bulk from resin). Solder PIR sensor to the board (see orientation in the image below).
 
-![PIR Sensor Standoff](BEAM_pir_standoff.jpg)
+![PIR Sensor Standoff](BEAM_PIR_standoff.jpg)
 
-![PIR Sensor Standoff Prints](BEAM_pir_standoff_prints.jpg)
+![PIR Sensor Standoff Prints](BEAM_PIR_standoff_prints.jpg)
 
 ![PIR Sensor Orientation](BEAM_pir_polarity.jpg)
 
