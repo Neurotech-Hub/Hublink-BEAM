@@ -611,7 +611,7 @@ bool HublinkBEAM::logData()
     // Format data string with new fields
     char dataString[128];
     snprintf(dataString, sizeof(dataString),
-             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%.3f,%.2f,%.2f,%.2f,%.2f,%d,%.3f,%d,%d,%.3f,%lu,%d",
+             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%.3f,%.2f,%.2f,%.2f,%.4f,%d,%.3f,%d,%d,%.3f,%lu,%d",
              now.year(), now.month(), now.day(),
              now.hour(), now.minute(), now.second(),
              millis(),
