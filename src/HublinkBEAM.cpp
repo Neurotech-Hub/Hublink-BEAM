@@ -936,14 +936,6 @@ bool HublinkBEAM::alarm(uint16_t minutes)
     uint32_t interval_seconds = (uint32_t)alarm_interval * 60;
     uint32_t next_alarm = alarm_start_time + interval_seconds;
 
-    // If next_alarm is not in the future, reset to current time
-    if (next_alarm <= current_time)
-    {
-        Serial.println("  Time adjustment detected, resetting alarm");
-        alarm_start_time = current_time;
-        next_alarm = alarm_start_time + interval_seconds;
-    }
-
     Serial.println("\nChecking alarm condition:");
     Serial.printf("  Current time: %d\n", current_time);
     Serial.printf("  Next alarm: %d\n", next_alarm);
@@ -955,6 +947,14 @@ bool HublinkBEAM::alarm(uint16_t minutes)
         // Update start time to the next interval
         alarm_start_time = next_alarm;
         Serial.println("  → Alarm triggered!");
+        // If next_alarm is not in the future the RTC must have been adjusted
+        // so we need to reset the alarm_start_time and next_alarm
+        if (next_alarm <= current_time)
+        {
+            Serial.println("  Time adjustment detected, resetting alarm");
+            alarm_start_time = current_time;
+            next_alarm = alarm_start_time + interval_seconds;
+        }
         return true;
     }
 
