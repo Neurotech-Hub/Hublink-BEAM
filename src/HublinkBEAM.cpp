@@ -944,9 +944,9 @@ bool HublinkBEAM::alarm(uint16_t minutes)
 
     if (current_time >= next_alarm)
     {
-        // Update start time to the next interval
-        alarm_start_time = next_alarm;
-        Serial.println("  → Alarm triggered!");
+        // Align alarm_start_time with the most recent interval boundary
+        alarm_start_time = current_time - (current_time % interval_seconds);
+        Serial.printf("  → Alarm triggered! New start time: %d\n", alarm_start_time);
         return true;
     }
 
