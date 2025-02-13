@@ -62,6 +62,28 @@ void setup()
     Serial.println("✗ BEAM Failed.");
     delay(1000); // Wait 1 second before retrying
   }
+
+  // we need BEAM begin to access switchBDown() and setNeoPixel()
+  // but this will write a new row/file
+  bool didSync = false;
+  while (beam.switchBDown())
+  {
+    beam.setNeoPixel(NEOPIXEL_OFF);
+    if (!didSync)
+    {
+      didSync = hublink.sync(SYNC_FOR_SECONDS);
+      delay(100); // repeat until sync is successful
+    }
+    else
+    {
+      // blink white after sync is successful
+      beam.setNeoPixel(NEOPIXEL_WHITE);
+      delay(100);
+      beam.setNeoPixel(NEOPIXEL_OFF);
+      delay(1000);
+    }
+  }
+
   beam.setLightGain(VEML7700_GAIN_2);
   beam.setLightIntegrationTime(VEML7700_IT_800MS);
 }
