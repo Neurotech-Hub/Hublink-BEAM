@@ -3,9 +3,13 @@
 
 HublinkBEAM beam;
 Hublink hublink(PIN_SD_CS);
-const unsigned long LOG_EVERY_MINUTES = 10;  // Log every X minutes
-const unsigned long SYNC_EVERY_MINUTES = 30; // Sync every X minutes
-const unsigned long SYNC_FOR_SECONDS = 30;   // Sync timeout in seconds
+
+// default values
+int LOG_EVERY_MINUTES = 10;         // Log every X minutes
+int SYNC_EVERY_MINUTES = 30;        // Sync every X minutes
+int SYNC_FOR_SECONDS = 30;          // Sync timeout in seconds
+bool NEW_FILE_ON_BOOT = true;       // Create new file on boot
+int INACTIVITY_PERIOD_SECONDS = 40; // Inactivity period in seconds
 
 // Hublink callback function to handle timestamp
 void onTimestampReceived(uint32_t timestamp)
@@ -16,13 +20,46 @@ void onTimestampReceived(uint32_t timestamp)
 
 void setup()
 {
+  // only begin when alarm is triggered (risks not catching error at setup though)
+  if (hublink.begin())
+  {
+    Serial.println("✓ Hublink.");
+    hublink.setTimestampCallback(onTimestampReceived);
+
+    // override default values with values from meta.json
+    if (hublink.hasMetaKey("beam", "log_every_minutes"))
+    {
+      LOG_EVERY_MINUTES = hublink.getMeta<int>("beam", "log_every_minutes");
+    }
+    if (hublink.hasMetaKey("beam", "sync_every_minutes"))
+    {
+      SYNC_EVERY_MINUTES = hublink.getMeta<int>("beam", "sync_every_minutes");
+    }
+    if (hublink.hasMetaKey("beam", "sync_for_seconds"))
+    {
+      SYNC_FOR_SECONDS = hublink.getMeta<int>("beam", "sync_for_seconds");
+    }
+    if (hublink.hasMetaKey("beam", "new_file_on_boot"))
+    {
+      NEW_FILE_ON_BOOT = hublink.getMeta<bool>("beam", "new_file_on_boot");
+    }
+    if (hublink.hasMetaKey("beam", "inactivity_period_seconds"))
+    {
+      INACTIVITY_PERIOD_SECONDS = hublink.getMeta<int>("beam", "inactivity_period_seconds");
+    }
+  }
+  else
+  {
+    Serial.println("✗ Hublink Failed.");
+  }
   // Configure behavior
-  beam.setNewFileOnBoot(true);  // false to continue using same file if it's the same day
-  beam.setInactivityPeriod(40); // 40 seconds; based on https://shorturl.at/JiZxK
+  beam.setNewFileOnBoot(NEW_FILE_ON_BOOT);             // false to continue using same file if it's the same day
+  beam.setInactivityPeriod(INACTIVITY_PERIOD_SECONDS); // 40 seconds; based on https://shorturl.at/JiZxK
 
   // Wait for the beam to initialize, retry (likely due to SD card ejecting)
   while (!beam.begin())
   {
+    Serial.println("✗ BEAM Failed.");
     delay(1000); // Wait 1 second before retrying
   }
   beam.setLightGain(VEML7700_GAIN_2);
@@ -37,21 +74,9 @@ void loop()
   if (beam.alarm(SYNC_EVERY_MINUTES))
   {
     Serial.println("Alarm triggered!");
-
-    // only begin when alarm is triggered (risks not catching error at setup though)
-    if (hublink.begin())
-    {
-      Serial.println("✓ Hublink.");
-      hublink.setTimestampCallback(onTimestampReceived);
-
-      // this is a forced sync, so it will ignore some of the settings in meta.json
-      // such as: advertise_every, advertise_for, or try_reconnect
-      hublink.sync(SYNC_FOR_SECONDS);
-    }
-    else
-    {
-      Serial.println("✗ Failed.");
-    }
+    // this is a forced sync, so it will ignore some of the settings in meta.json
+    // such as: advertise_every, advertise_for, or try_reconnect
+    hublink.sync(SYNC_FOR_SECONDS);
   }
 
   /*

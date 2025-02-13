@@ -39,6 +39,7 @@ class DateTime;
 #define NEOPIXEL_GREEN 0x00FF00
 #define NEOPIXEL_BLUE 0x0000FF
 #define NEOPIXEL_PURPLE 0x800080
+#define NEOPIXEL_WHITE 0xFFFFFF
 #define NEOPIXEL_DIM 3
 
 // Environmental constants
@@ -105,6 +106,9 @@ public:
     // Alarm function: if minutes > 0, sets/updates alarm; if minutes = 0, checks if alarm triggered
     bool alarm(uint16_t minutes = 0);
 
+    bool switchADown();
+    bool switchBDown();
+
 private:
     void initPins();
     bool initSensors(bool isWakeFromSleep);
@@ -113,7 +117,6 @@ private:
     bool isSDCardPresent();           // Checks if SD card is inserted
     void enableSDPower();
     void disableSDPower();
-    bool doDebug();
     bool _isLowBattery;
     bool _isWakeFromSleep;          // Track wake state
     bool _newFileOnBoot = true;     // Controls whether to create new file on each boot

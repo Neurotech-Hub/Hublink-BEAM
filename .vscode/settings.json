@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "*.html": "jinja-html",
         "__bit_reference": "cpp",
         "__hash_table": "cpp",
         "__split_buffer": "cpp",
@@ -19,6 +20,10 @@
         "vector": "cpp",
         "format": "cpp",
         "ostream": "cpp",
-        "print": "cpp"
+        "print": "cpp",
+        "istream": "cpp",
+        "locale": "cpp",
+        "streambuf": "cpp",
+        "*.tcc": "cpp"
     }
 }

@@ -33,7 +33,7 @@ bool HublinkBEAM::begin()
     setNeoPixel(NEOPIXEL_BLUE);
 
     Serial.begin(115200);
-    if (doDebug())
+    if (switchADown())
     {
         // Wait up to 10 seconds for Serial connection
         unsigned long startTime = millis();
@@ -331,7 +331,7 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
         {
             Serial.println("  PIR: starting stabilization");
             // Use delay if USB is connected, light sleep has issues disconnecting otherwise
-            int delayTime = doDebug() ? 3000 : ZDP323_TSTAB_MS;
+            int delayTime = switchADown() ? 3000 : ZDP323_TSTAB_MS;
             if (Serial)
             {
                 Serial.println("  PIR: using delay (USB connected)");
@@ -401,9 +401,14 @@ void HublinkBEAM::disableSDPower()
     digitalWrite(PIN_SD_PWR_EN, LOW);
 }
 
-bool HublinkBEAM::doDebug()
+bool HublinkBEAM::switchADown()
 {
     return digitalRead(PIN_SWITCH_A) == LOW;
+}
+
+bool HublinkBEAM::switchBDown()
+{
+    return digitalRead(PIN_SWITCH_B) == LOW;
 }
 
 String HublinkBEAM::getCurrentFilename()
@@ -543,7 +548,7 @@ bool HublinkBEAM::createFile(String filename)
 
 bool HublinkBEAM::logData()
 {
-    if (doDebug())
+    if (switchADown())
     {
         delay(2000);
     }
