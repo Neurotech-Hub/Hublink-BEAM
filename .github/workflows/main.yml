@@ -1,11 +1,11 @@
 name: Validate Library Version and Create Release  
 
-on:  
+on:
   pull_request:  
-    types: [opened, synchronize, reopened]  
-
-jobs:  
-  validate-and-release:  
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:    # Add this line to enable manual triggering
+jobs:
+  validate-and-release:
     runs-on: ubuntu-latest  
     permissions:  
       contents: write  
