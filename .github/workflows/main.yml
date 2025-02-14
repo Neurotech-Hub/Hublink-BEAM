@@ -15,6 +15,6 @@ jobs:
         uses: actions/checkout@v3  
 
       - name: Arduino Library Deploy  
-        uses: Neurotech-Hub/arduino-library-deploy@latest
+        uses: Neurotech-Hub/arduino-library-deploy@main
         env:  
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
