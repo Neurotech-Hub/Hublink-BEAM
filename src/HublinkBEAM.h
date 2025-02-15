@@ -124,6 +124,8 @@ private:
     double _inactivity_fraction;    // Track inactivity as fraction of possible periods
     uint16_t _inactivityPeriod = 0; // Inactivity period in seconds (0 = disabled)
     uint32_t _minFreeHeap;          // Track minimum free heap
+    uint32_t _elapsed_seconds;      // Store elapsed time for inactivity calculations
+    double _active_seconds;         // Store active time for inactivity calculations
     File _dataFile;
     bool _isSDInitialized;
     ZDP323 _pirSensor;

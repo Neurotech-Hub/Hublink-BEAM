@@ -99,15 +99,14 @@ bool HublinkBEAM::begin()
         Serial.printf("Overall Status: %s\n", allInitialized ? "OK" : "FAILED");
         Serial.println("--------------------------------");
     }
-    else
+    else // waking from deep sleep
     {
-        const uint32_t current_time = getUnixTime();
-        const uint32_t elapsed_seconds = current_time - sleep_start_time;
-        const uint16_t pir_count = _ulp.getPIRCount();
+        // Calculate and store time values
+        _elapsed_seconds = getUnixTime() - sleep_start_time;
+        _active_seconds = static_cast<double>(_ulp.getPIRCount()) * 1.0;
 
-        // Use consistent type for all time-based calculations
-        const double active_seconds = static_cast<double>(pir_count) * 1.0;
-        _pir_percent_active = (elapsed_seconds > 0) ? std::min(1.0, active_seconds / static_cast<double>(elapsed_seconds)) : 0.0;
+        // Calculate activity percentage
+        _pir_percent_active = (_elapsed_seconds > 0) ? std::min(1.0, _active_seconds / static_cast<double>(_elapsed_seconds)) : 0.0;
 
         /*
         Timeline Example (elapsed_seconds = 100, _inactivityPeriod = 20)
@@ -136,35 +135,10 @@ bool HublinkBEAM::begin()
         _inactivity_fraction = 100 / (100 + 0) = 1.0 (100% inactive)
         */
 
-        // Calculate inactivity fraction if period is set
-        _inactivity_fraction = 0.0;
-        if (_inactivityPeriod > 0)
-        {
-            const uint16_t inactivity_count = _ulp.getInactivityCount();
-            const double possible_inactive_periods = static_cast<double>(elapsed_seconds) /
-                                                     static_cast<double>(_inactivityPeriod);
-            if (possible_inactive_periods > 0)
-            {
-                const double inactive_seconds = static_cast<double>(inactivity_count) *
-                                                static_cast<double>(_inactivityPeriod);
-                // note, inactive seconds is tallied based on _inactivityPeriod, not actual single seconds.
-                // So by including active_seconds in the denominator, we are able to calculate the fraction of time
-                // that was inactive to include the time outside of the last _inactivityPeriod; even a full
-                // _inactivityPeriod wasn't met, we still have a true fraction of time that was inactive.
-                _inactivity_fraction = std::min(1.0,
-                                                inactive_seconds / (inactive_seconds + active_seconds));
-            }
-        }
-
         Serial.printf("\nActivity Report:\n");
-        Serial.printf("  Total time: %d seconds\n", elapsed_seconds);
-        Serial.printf("  Active time: %.3f seconds\n", active_seconds);
+        Serial.printf("  Total time: %d seconds\n", _elapsed_seconds);
+        Serial.printf("  Active time: %.3f seconds\n", _active_seconds);
         Serial.printf("  Activity percentage: %.3f%%\n", _pir_percent_active * 100.0);
-        if (_inactivityPeriod > 0)
-        {
-            Serial.printf("  Inactivity period: %d seconds\n", _inactivityPeriod);
-            Serial.printf("  Inactivity fraction: %.3f%%\n", _inactivity_fraction * 100.0);
-        }
     }
 
     // Set final NeoPixel state based on initialization result
@@ -555,7 +529,7 @@ bool HublinkBEAM::logData()
 
     uint16_t pirCount = _ulp.getPIRCount(); // clear in sleep()
     uint16_t inactivityCount = (_inactivityPeriod > 0) ? _ulp.getInactivityCount() : 0;
-    _minFreeHeap = ESP.getMinFreeHeap(); // Get minimum free heap since boot
+    _minFreeHeap = ESP.getMinFreeHeap();
 
     // Check for required sensors and SD card
     if (!_isSDInitialized || !isSDCardPresent())
@@ -612,6 +586,31 @@ bool HublinkBEAM::logData()
     float pressHpa = _isEnvSensorInitialized ? getPressure() : -1.0f;
     float humidity = _isEnvSensorInitialized ? getHumidity() : -1.0f;
     float lux = _isLightSensorInitialized ? getLux() : -1.0f;
+
+    // Calculate inactivity fraction if period is set and we're waking from sleep
+    _inactivity_fraction = 0.0; // Default for non-wake or no period set
+    if (_isWakeFromSleep && _inactivityPeriod > 0)
+    {
+        const double possible_inactive_periods = static_cast<double>(_elapsed_seconds) /
+                                                 static_cast<double>(_inactivityPeriod);
+        if (possible_inactive_periods > 0)
+        {
+            const double inactive_seconds = static_cast<double>(inactivityCount) *
+                                            static_cast<double>(_inactivityPeriod);
+            // note, inactive seconds is tallied based on _inactivityPeriod, not actual single seconds.
+            // So by including active_seconds in the denominator, we are able to calculate the fraction of time
+            // that was inactive to include the time outside of the last _inactivityPeriod; even a full
+            // _inactivityPeriod wasn't met, we still have a true fraction of time that was inactive.
+            _inactivity_fraction = std::min(1.0,
+                                            inactive_seconds / (inactive_seconds + _active_seconds));
+        }
+    }
+
+    if (_inactivityPeriod > 0)
+    {
+        Serial.printf("  Inactivity period: %d seconds\n", _inactivityPeriod);
+        Serial.printf("  Inactivity fraction: %.3f%%\n", _inactivity_fraction * 100.0);
+    }
 
     // Format data string with new fields
     char dataString[128];
