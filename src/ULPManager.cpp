@@ -130,8 +130,6 @@ void ULPManager::start()
 
 void ULPManager::stop()
 {
-    Serial.println("  ULP: stopping program");
-
     // First disable holds
     rtc_gpio_hold_dis(SDA_GPIO);
     rtc_gpio_hold_dis((gpio_num_t)PIN_SD_PWR_EN);
@@ -145,8 +143,6 @@ void ULPManager::stop()
     rtc_gpio_set_direction((gpio_num_t)PIN_SD_PWR_EN, RTC_GPIO_MODE_DISABLED);
     rtc_gpio_deinit((gpio_num_t)PIN_SD_PWR_EN);
 
-    // Try to halt the ULP program
-    ulp_timer_stop();
     Serial.println("  ULP: program stopped");
 }
 

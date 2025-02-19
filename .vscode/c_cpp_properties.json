@@ -4,7 +4,8 @@
             "name": "Mac",
             "includePath": [
                 "${workspaceFolder}/**",
-                "~/Library/Arduino15/packages/esp32/**"
+                "${userHome}/Library/Arduino15/packages/esp32/**",
+                "${userHome}/Documents/Arduino-ESP32/libraries/**"
             ],
             "defines": [
                 "ESP32S3",
