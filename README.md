@@ -4,8 +4,8 @@ An Arduino library for the Hublink BEAM ESP32-S3 data logging device. This libra
 
 ## Installation
 
-1. Clone or download this repository to the libraries folder in the Arduino IDE, (or use Sketch -> Include Library -> Add .ZIP Library).
-2. Install the dependencies from [library.properties](library.properties) and [https://github.com/Neurotech-Hub/Hublink-Node](https://github.com/Neurotech-Hub/Hublink-Node):
+1. Install the Hublink-BEAM library from Arduino IDE. Alternatively (but not recommended), clone or download this repository to the libraries folder in the Arduino IDE, (or use Sketch -> Include Library -> Add .ZIP Library).
+2. Ensure the dependencies are installed for [library.properties](library.properties) and [https://github.com/Neurotech-Hub/Hublink-Node](https://github.com/Neurotech-Hub/Hublink-Node):
 - RTClib
 - Adafruit MAX1704X
 - Adafruit BME280 Library
