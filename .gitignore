@@ -59,3 +59,5 @@ libraries/
 *.out
 *.app 
 ~*.xlsx
+
+.library.properties
