@@ -32,7 +32,7 @@
 #define ZDP323_CONFIG_FILSEL_MASK 0x07
 
 // Timing constants
-#define ZDP323_TSTAB_MS 30000 // Stability time (30 seconds)
+#define ZDP323_TSTAB_MS 10000 // Stability time (10 seconds)
 #define ZDP323_TCYC_MS 10     // Minimum time between peak hold reads
 
 class ZDP323

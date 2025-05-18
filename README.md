@@ -4,6 +4,8 @@ An Arduino library for the Hublink BEAM ESP32-S3 data logging device. This libra
 
 ## Installation
 
+The ESP32-S3 we are using appears to have issues with the latest board release from Espressif. In Arduino IDE, you use Boards Manager to install the Espressif `esp32` board package. The current, stable board package is 3.7.0. **Do not upgrade.**
+
 1. Install the Hublink-BEAM library from Arduino IDE. Alternatively (but not recommended), clone or download this repository to the libraries folder in the Arduino IDE, (or use Sketch -> Include Library -> Add .ZIP Library).
 2. Ensure the dependencies are installed for [library.properties](library.properties) and [https://github.com/Neurotech-Hub/Hublink-Node](https://github.com/Neurotech-Hub/Hublink-Node):
 - RTClib
