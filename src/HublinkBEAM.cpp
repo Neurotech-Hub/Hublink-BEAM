@@ -215,7 +215,7 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
         _isBatteryMonitorInitialized = true;
 
         // Replace single delay with retry loop
-        const uint8_t MAX_RETRIES = 10;
+        const uint8_t MAX_RETRIES = 20;
         uint8_t retries = 0;
         float voltage = 0;
 
