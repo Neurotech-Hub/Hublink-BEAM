@@ -60,7 +60,7 @@ const ulp_insn_t ulp_program[] = {
     I_LD(R0, R1, 0),              // Load current INACTIVITY_COUNT
     I_ADDI(R0, R0, 1),            // Increment INACTIVITY_COUNT
     I_ST(R0, R1, 0),              // Store updated INACTIVITY_COUNT
-    // I_WR_REG(RTC_GPIO_OUT_REG, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, 1), // LED off at start
+    // I_WR_REG(RTC_GPIO_OUT_REG, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, LED_GPIO_INDEX + RTC_GPIO_OUT_DATA_S, 1), // LED on
 
     // Reset tracker
     M_LABEL(8),

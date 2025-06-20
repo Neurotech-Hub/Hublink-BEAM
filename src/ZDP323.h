@@ -12,7 +12,7 @@
 #define ZDP323_REG_PEAK_HOLD 0x0A // Peak Hold register address
 
 // Configuration defaults from documentation
-#define ZDP323_CONFIG_DETLVL_DEFAULT 0x40  // B22-B15: 01000000 (threshold = ±512 ADC)
+#define ZDP323_CONFIG_DETLVL_DEFAULT 0x22  // B22-B15: 01000000 (threshold = ±512 ADC)
 #define ZDP323_CONFIG_TRIGOM_DISABLED 0x00 // B23: 0 (disabled)
 #define ZDP323_CONFIG_TRIGOM_ENABLED 0x01  // B23: 1 (enabled)
 #define ZDP323_CONFIG_TRIGOM_MASK 0x01
