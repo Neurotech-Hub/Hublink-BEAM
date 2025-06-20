@@ -24,9 +24,12 @@ void setup()
   while (!beam.begin())
   {
     Serial.println("✗ BEAM Failed.");
+    beam.setNeoPixel(NEOPIXEL_RED);
     delay(1000); // Wait 1 second before retrying
   }
+  beam.setNeoPixel(NEOPIXEL_OFF);
 
+  // we don't check for hublink success here because we want to continue setup even if hublink fails
   beginHublink();  // reads meta.json and overrides default values if found
   syncOnSwitchB(); // force hublink sync if switch B is down
 
@@ -97,26 +100,34 @@ void beginHublink()
   else
   {
     Serial.println("✗ Hublink Failed.");
+    beam.setNeoPixel(NEOPIXEL_RED);
   }
 }
 
 void syncOnSwitchB()
 {
   bool didSync = false;
+  Serial.println("Switch B pressed - entering sync mode");
   while (beam.switchBDown())
   {
-    beam.setNeoPixel(NEOPIXEL_OFF);
     if (!didSync)
     {
+      Serial.println("Starting sync...");
+      beam.setNeoPixel(NEOPIXEL_RED);
       didSync = hublink.sync(SYNC_FOR_SECONDS);
+      beam.setNeoPixel(NEOPIXEL_OFF);
+      Serial.printf("Sync %s\n", didSync ? "successful" : "failed");
+      delay(200);
     }
     else
     {
       // blink white after sync is successful
+      Serial.println("Sync complete - blinking LED");
       beam.setNeoPixel(NEOPIXEL_WHITE);
       delay(100);
       beam.setNeoPixel(NEOPIXEL_OFF);
       hublink.sleep(2); // esp light sleep for 2 seconds
     }
   }
+  Serial.println("Switch B released - exiting sync mode");
 }

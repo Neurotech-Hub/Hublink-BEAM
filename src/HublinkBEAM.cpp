@@ -239,7 +239,8 @@ bool HublinkBEAM::initSensors(bool isWakeFromSleep)
         Serial.printf("    Percent: %.1f%%\n", percent);
         Serial.printf("    isnan(voltage): %d\n", isnan(voltage));
 
-        if (voltage < LOW_BATTERY_THRESHOLD)
+        // Allow to run on low battery if switch A is down
+        if (voltage < LOW_BATTERY_THRESHOLD && !switchADown())
         {
             Serial.printf("  Low battery detected: %.2fV\n", voltage);
             _isLowBattery = true;
