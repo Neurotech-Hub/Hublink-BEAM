@@ -46,7 +46,7 @@ class DateTime;
 #define SEALEVELPRESSURE_HPA (1013.25)
 
 // Rules
-#define LOW_BATTERY_THRESHOLD 3.4
+#define LOW_BATTERY_THRESHOLD 3.7
 
 // CSV Header
 #define CSV_HEADER "datetime,millis,battery_voltage,temperature_c,pressure_hpa,humidity_percent,lux,activity_count,activity_percent,inactivity_period_s,inactivity_count,inactivity_percent,min_free_heap,reboot"

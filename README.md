@@ -22,6 +22,47 @@ The ESP32-S3 we are using appears to have issues with the latest board release f
 ### Debug Mode
 You may enable debugging mode by placing the `A` switch down. This will reduce the PIR sensor initialization period and introduce delays before Serial statements so they can be read by a serial terminal. These delays are useful for debugging, but should be removed for normal operation.
 
+### RTC Setting
+Setting the RTC is performed using the compilation time of the sketch. This is not always accurate and typically requires a clearing of your sketch cache to ensure correctness.
+
+**Clear Arduino IDE Cache:**
+
+On **MacOS**:
+```bash
+rm -rf /Users/<username>/Library/Caches/arduino/sketches
+```
+
+On **Windows**:
+```cmd
+rmdir /s "%LOCALAPPDATA%\Arduino15\packages\esp32\tools\esptool_py\*\cache"
+del /s /q "%TEMP%\arduino_*"
+```
+
+On **Linux**:
+```bash
+rm -rf ~/.arduino15/packages/esp32/tools/esptool_py/*/cache
+rm -rf /tmp/arduino_*
+```
+
+**Alternative RTC Setting Methods:**
+
+1. **Manual RTC Setting** (more accurate):
+   ```cpp
+   // Set RTC to specific date/time
+   beam.adjustRTC(DateTime(2024, 1, 15, 10, 30, 0)); // Year, Month, Day, Hour, Minute, Second
+   ```
+
+2. **Unix Timestamp Setting**:
+   ```cpp
+   // Set RTC using Unix timestamp
+   beam.adjustRTC(1705315800); // Unix timestamp
+   ```
+
+3. **Ensure Fresh Compilation**:
+   - Close Arduino IDE completely
+   - Clear cache as shown above
+   - Reopen IDE and compile/upload immediately for most accurate compilation time
+
 ## Hardware Assembly
 For detailed hardware assembly instructions, including the required low-power modification, see [docs/assembly.md](docs/assembly.md).
 

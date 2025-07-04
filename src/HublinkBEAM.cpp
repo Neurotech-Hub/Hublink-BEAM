@@ -61,11 +61,12 @@ bool HublinkBEAM::begin()
     // Always reinitialize SD card after deep sleep
     if (!initSD())
     {
+        Serial.println("*** SD card initialization failed in begin() ***");
         allInitialized = false;
     }
 
-    // Initialize sensors (with optimization if waking from sleep), skip if SD card failed
-    if (!initSensors(_isWakeFromSleep) && allInitialized)
+    // Initialize sensors (with optimization if waking from sleep)
+    if (!initSensors(_isWakeFromSleep))
     {
         allInitialized = false;
     }
@@ -149,6 +150,15 @@ bool HublinkBEAM::begin()
     }
     else
     {
+        Serial.println("*** INITIALIZATION FAILED ***");
+        Serial.printf("  SD: %s\n", _isSDInitialized ? "OK" : "FAILED");
+        Serial.printf("  PIR: %s\n", _isPIRInitialized ? "OK" : "FAILED");
+        Serial.printf("  Battery: %s\n", _isBatteryMonitorInitialized ? "OK" : "FAILED");
+        Serial.printf("  Env: %s\n", _isEnvSensorInitialized ? "OK" : "FAILED");
+        Serial.printf("  Light: %s\n", _isLightSensorInitialized ? "OK" : "FAILED");
+        Serial.printf("  RTC: %s\n", _isRTCInitialized ? "OK" : "FAILED");
+        Serial.printf("  Low Battery: %s\n", _isLowBattery ? "YES" : "NO");
+
         if (_isLowBattery)
         {
             setNeoPixel(NEOPIXEL_PURPLE); // Purple for low battery
@@ -175,6 +185,14 @@ void HublinkBEAM::initPins()
     pinMode(PIN_SD_DET, INPUT_PULLUP); // converts to input during sleep
     pinMode(PIN_SD_PWR_EN, OUTPUT);
     enableSDPower();
+
+    // Add delay for SD card power stabilization
+    delay(50); // Give SD card time to power up and stabilize
+
+    // Ensure SPI pins are configured properly (especially after wake from sleep)
+    pinMode(MOSI, OUTPUT);
+    pinMode(MISO, INPUT);
+    pinMode(SCK, OUTPUT);
 
     // Initialize on-board LED
     pinMode(PIN_FRONT_LED, OUTPUT);
@@ -350,15 +368,27 @@ bool HublinkBEAM::initSD()
         return false;
     }
 
-    if (!SD.begin(PIN_SD_CS))
+    // Try SD initialization with retry logic
+    const uint8_t MAX_RETRIES = 3;
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
     {
-        Serial.println("SD card initialization failed!");
-        return false;
-    }
-    SD.exists("/x.txt"); // trick to enter SD idle state
+        if (attempt > 0)
+        {
+            Serial.printf("SD init retry %d/%d\n", attempt + 1, MAX_RETRIES);
+            delay(100); // Brief delay between retries
+        }
 
-    _isSDInitialized = true;
-    return true;
+        if (SD.begin(PIN_SD_CS))
+        {
+            SD.exists("/x.txt"); // trick to enter SD idle state
+            _isSDInitialized = true;
+            Serial.println("SD card initialized successfully");
+            return true;
+        }
+    }
+
+    Serial.println("SD card initialization failed after all retries!");
+    return false;
 }
 
 bool HublinkBEAM::isSDCardPresent()
@@ -533,9 +563,24 @@ bool HublinkBEAM::logData()
     _minFreeHeap = ESP.getMinFreeHeap();
 
     // Check for required sensors and SD card
-    if (!_isSDInitialized || !isSDCardPresent())
+    if (!_isSDInitialized)
     {
-        Serial.println("Cannot log: SD card not initialized or not present");
+        Serial.println("Cannot log: SD card not initialized");
+        setNeoPixel(NEOPIXEL_RED);
+        return false;
+    }
+
+    if (!isSDCardPresent())
+    {
+        Serial.println("Cannot log: SD card not present");
+        setNeoPixel(NEOPIXEL_RED);
+        return false;
+    }
+
+    // Test SD card is actually working by attempting to read card info
+    if (!SD.cardSize())
+    {
+        Serial.println("Cannot log: SD card not responding (cardSize failed)");
         setNeoPixel(NEOPIXEL_RED);
         return false;
     }
@@ -565,6 +610,16 @@ bool HublinkBEAM::logData()
     if (!dataFile)
     {
         Serial.println("Failed to open file for logging: " + currentFile);
+        Serial.println("*** SD card may have failed after initialization ***");
+        // Try to check if SD card is still present and working
+        if (!isSDCardPresent())
+        {
+            Serial.println("SD card no longer present!");
+        }
+        else if (!SD.cardSize())
+        {
+            Serial.println("SD card no longer responding!");
+        }
         setNeoPixel(NEOPIXEL_RED);
         delay(1000); // linger for a moment on error
         return false;
@@ -692,7 +747,6 @@ void HublinkBEAM::sleep(uint32_t minutes)
     }
 
     // Prepare for sleep
-    disableNeoPixel();
     digitalWrite(LED_BUILTIN, LOW);
     digitalWrite(PIN_FRONT_LED, LOW);
     pinMode(PIN_SD_DET, INPUT);
@@ -717,6 +771,7 @@ void HublinkBEAM::sleep(uint32_t minutes)
 
     Serial.printf("Entering deep sleep for %d minutes (%d seconds)\n", minutes, seconds);
     Serial.flush();
+    disableNeoPixel();
 
     // Enable timer wakeup
     uint64_t microseconds = (uint64_t)seconds * 1000000ULL;

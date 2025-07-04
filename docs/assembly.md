@@ -15,7 +15,7 @@
 
 ![Circuit Side View](BEAM_circuit_side.jpg)
 
-5. Inser the coin cell for the RTC.
+5. Insert the coin cell for the RTC.
 6. Turn the module "OFF" and ensure both switches remain "UP" (towards the A/B markers) for production deployment.
 
 ### Low Power Modification

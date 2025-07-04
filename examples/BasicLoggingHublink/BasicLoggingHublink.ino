@@ -91,24 +91,26 @@ void beginHublink() {
 }
 
 void syncOnSwitchB() {
-  bool didSync = false;
-  Serial.println("Switch B pressed - entering sync mode");
-  while (beam.switchBDown()) {
-    if (!didSync) {
-      Serial.println("Starting sync...");
-      beam.setNeoPixel(NEOPIXEL_RED);
-      didSync = hublink.sync(SYNC_FOR_SECONDS);
-      beam.setNeoPixel(NEOPIXEL_OFF);
-      Serial.printf("Sync %s\n", didSync ? "successful" : "failed");
-      delay(200);
-    } else {
-      // blink white after sync is successful
-      Serial.println("Sync complete - blinking LED");
-      beam.setNeoPixel(NEOPIXEL_WHITE);
-      delay(100);
-      beam.setNeoPixel(NEOPIXEL_OFF);
-      hublink.sleep(2);  // esp light sleep for 2 seconds
+  if (beam.switchBDown()) {
+    bool didSync = false;
+    Serial.println("Switch B pressed - entering sync mode");
+    while (beam.switchBDown()) {
+      if (!didSync) {
+        Serial.println("Starting sync...");
+        beam.setNeoPixel(NEOPIXEL_RED);
+        didSync = hublink.sync(SYNC_FOR_SECONDS);
+        beam.setNeoPixel(NEOPIXEL_OFF);
+        Serial.printf("Sync %s\n", didSync ? "successful" : "failed");
+        delay(200);
+      } else {
+        // blink white after sync is successful
+        Serial.println("Sync complete - blinking LED");
+        beam.setNeoPixel(NEOPIXEL_WHITE);
+        delay(100);
+        beam.setNeoPixel(NEOPIXEL_OFF);
+        hublink.sleep(2);  // esp light sleep for 2 seconds
+      }
     }
+    Serial.println("Switch B released - exiting sync mode");
   }
-  Serial.println("Switch B released - exiting sync mode");
 }
