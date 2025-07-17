@@ -4,7 +4,7 @@
 HublinkBEAM beam;
 Hublink hublink(PIN_SD_CS);
 
-// default values
+// default values, !! overriden by meta.json !!
 int LOG_EVERY_MINUTES = 10;         // Log every X minutes
 int SYNC_EVERY_MINUTES = 30;        // Sync every X minutes
 int SYNC_FOR_SECONDS = 30;          // Sync timeout in seconds
