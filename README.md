@@ -4,10 +4,11 @@ An Arduino library for the Hublink BEAM ESP32-S3 data logging device. This libra
 
 ## Installation
 
-The ESP32-S3 we are using appears to have issues with the latest board release from Espressif. In Arduino IDE, you use Boards Manager to install the Espressif `esp32` board package. The current, stable board package is 3.7.0. **Do not upgrade.**
+1. In Arduino IDE, you use Boards Manager to install the Espressif `esp32` board package.
 
-1. Install the Hublink-BEAM library from Arduino IDE. Alternatively (but not recommended), clone or download this repository to the libraries folder in the Arduino IDE, (or use Sketch -> Include Library -> Add .ZIP Library).
-2. Ensure the dependencies are installed for [library.properties](library.properties) and [https://github.com/Neurotech-Hub/Hublink-Node](https://github.com/Neurotech-Hub/Hublink-Node):
+2. Install the Hublink-BEAM library from Arduino IDE. Alternatively (but not recommended), clone or download this repository to the libraries folder in the Arduino IDE, (or use Sketch -> Include Library -> Add .ZIP Library).
+
+3. Ensure the dependencies are installed for [library.properties](library.properties) and [https://github.com/Neurotech-Hub/Hublink-Node](https://github.com/Neurotech-Hub/Hublink-Node):
 - RTClib
 - Adafruit MAX1704X
 - Adafruit BME280 Library
@@ -15,9 +16,13 @@ The ESP32-S3 we are using appears to have issues with the latest board release f
 - Adafruit NeoPixel
 - ESP32Time
 - Preferences
-3. Ensure the power switch is in the `ON` position.
-4. If the device has been previously flashed, it may be in a deep sleep state and will not connect to the serial port. To enter boot mode, hold the `Boot` button and toggle the `Reset` button (then release the `Boot` button).
-5. If the Arduino IDE does not indicate that it is connected to "Adafruit Feather ESP32-S3 2MB PSRAM", click Tools -> Board -> esp32 -> Adafruit Feather ESP32-S3 2MB PSRAM (you will need to download the esp32 board package (by espressif) from the Arduino IDE).
+
+**Testing**
+1. Ensure the power switch is in the `ON` position.
+
+2. If the device has been previously flashed, it may be in a deep sleep state and will not connect to the serial port. To enter boot mode, hold the `Boot` button and toggle the `Reset` button (then release the `Boot` button).
+
+3. If the Arduino IDE does not indicate that it is connected to "Adafruit Feather ESP32-S3 2MB PSRAM", click Tools -> Board -> esp32 -> Adafruit Feather ESP32-S3 2MB PSRAM (you will need to download the esp32 board package (by espressif) from the Arduino IDE).
 
 ### Debug Mode
 You may enable debugging mode by placing the `A` switch down. This will reduce the PIR sensor initialization period and introduce delays before Serial statements so they can be read by a serial terminal. These delays are useful for debugging, but should be removed for normal operation.
