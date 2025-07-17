@@ -64,6 +64,10 @@ public:
     void setNewFileOnBoot(bool value) { _newFileOnBoot = value; }
     bool getNewFileOnBoot() { return _newFileOnBoot; }
 
+    // Device ID control
+    void setDeviceID(String deviceID);
+    String getDeviceID() { return _deviceID; }
+
     // Inactivity period control
     void setInactivityPeriod(uint16_t seconds) { _inactivityPeriod = seconds; }
     uint16_t getInactivityPeriod() { return _inactivityPeriod; }
@@ -120,6 +124,7 @@ private:
     bool _isLowBattery;
     bool _isWakeFromSleep;          // Track wake state
     bool _newFileOnBoot = true;     // Controls whether to create new file on each boot
+    String _deviceID = "XXX";       // Device ID for filename (3 characters)
     double _pir_percent_active;     // Track PIR activity as fraction of sleep time
     double _inactivity_fraction;    // Track inactivity as fraction of possible periods
     uint16_t _inactivityPeriod = 0; // Inactivity period in seconds (0 = disabled)

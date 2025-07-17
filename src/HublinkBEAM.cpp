@@ -20,6 +20,41 @@ HublinkBEAM::HublinkBEAM() : _pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800)
     _pir_percent_active = 0.0;
 }
 
+void HublinkBEAM::setDeviceID(String deviceID)
+{
+    // Validate device ID: must be exactly 3 characters and alphanumeric
+    if (deviceID.length() != 3)
+    {
+        Serial.println("Warning: Device ID must be exactly 3 characters, using default 'XXX'");
+        _deviceID = "XXX";
+        return;
+    }
+
+    // Check if all characters are alphanumeric
+    bool isValid = true;
+    for (int i = 0; i < 3; i++)
+    {
+        char c = deviceID.charAt(i);
+        if (!isalnum(c))
+        {
+            isValid = false;
+            break;
+        }
+    }
+
+    if (!isValid)
+    {
+        Serial.println("Warning: Device ID must be alphanumeric, using default 'XXX'");
+        _deviceID = "XXX";
+        return;
+    }
+
+    // Convert to uppercase for consistency
+    deviceID.toUpperCase();
+    _deviceID = deviceID;
+    Serial.printf("Device ID set to: %s\n", _deviceID.c_str());
+}
+
 bool HublinkBEAM::begin()
 {
     // Stop ULP to free up GPIO pins and stop ULP timer
@@ -431,32 +466,42 @@ String HublinkBEAM::getCurrentFilename()
     // If we have a stored filename, check if it's from today
     if (storedFilename.length() > 0)
     {
-        // Extract date from stored filename (format: /BEAM_YYYYMMDDXX.csv)
-        int storedYear = storedFilename.substring(6, 10).toInt();
-        int storedMonth = storedFilename.substring(10, 12).toInt();
-        int storedDay = storedFilename.substring(12, 14).toInt();
-
-        Serial.println("\nComparing dates:");
-        Serial.printf("  Stored filename: %s\n", storedFilename.c_str());
-        Serial.printf("  Stored date: %04d-%02d-%02d\n", storedYear, storedMonth, storedDay);
-        Serial.printf("  Current date: %04d-%02d-%02d\n", now.year(), now.month(), now.day());
-
-        bool isFromToday = (storedYear == now.year() &&
-                            storedMonth == now.month() &&
-                            storedDay == now.day());
-
-        // If waking from sleep and file is from today, use it
-        if (_isWakeFromSleep && isFromToday && SD.exists(storedFilename))
+        // Extract date from stored filename (format: /BEAMXXX_YYYYMMDDXX.csv)
+        // Find the underscore after device ID to locate the date part
+        int underscorePos = storedFilename.indexOf('_');
+        if (underscorePos != -1)
         {
-            Serial.printf("  Using existing file (wake from sleep): %s\n", storedFilename.c_str());
-            return storedFilename;
+            int dateStart = underscorePos + 1;
+            int storedYear = storedFilename.substring(dateStart, dateStart + 4).toInt();
+            int storedMonth = storedFilename.substring(dateStart + 4, dateStart + 6).toInt();
+            int storedDay = storedFilename.substring(dateStart + 6, dateStart + 8).toInt();
+
+            Serial.println("\nComparing dates:");
+            Serial.printf("  Stored filename: %s\n", storedFilename.c_str());
+            Serial.printf("  Stored date: %04d-%02d-%02d\n", storedYear, storedMonth, storedDay);
+            Serial.printf("  Current date: %04d-%02d-%02d\n", now.year(), now.month(), now.day());
+
+            bool isFromToday = (storedYear == now.year() &&
+                                storedMonth == now.month() &&
+                                storedDay == now.day());
+
+            // If waking from sleep and file is from today, use it
+            if (_isWakeFromSleep && isFromToday && SD.exists(storedFilename))
+            {
+                Serial.printf("  Using existing file (wake from sleep): %s\n", storedFilename.c_str());
+                return storedFilename;
+            }
+
+            // If not waking from sleep and newFileOnBoot is false, try to use today's file
+            if (!_isWakeFromSleep && !getNewFileOnBoot() && isFromToday && SD.exists(storedFilename))
+            {
+                Serial.printf("  Using existing file (same day): %s\n", storedFilename.c_str());
+                return storedFilename;
+            }
         }
-
-        // If not waking from sleep and newFileOnBoot is false, try to use today's file
-        if (!_isWakeFromSleep && !getNewFileOnBoot() && isFromToday && SD.exists(storedFilename))
+        else
         {
-            Serial.printf("  Using existing file (same day): %s\n", storedFilename.c_str());
-            return storedFilename;
+            Serial.println("  Invalid stored filename format (no underscore found)");
         }
     }
 
@@ -475,8 +520,9 @@ String HublinkBEAM::getCurrentFilename()
         // Try each possible number (00-99)
         for (uint8_t num = 0; num < 100; num++)
         {
-            char testFilename[24]; // /BEAM_YYYYMMDDXX.csv (23 chars + null terminator)
-            snprintf(testFilename, sizeof(testFilename), "/BEAM_%s%02d.csv", baseFilename, num);
+            char testFilename[28]; // /BEAMXXX_YYYYMMDDXX.csv (23 chars + null terminator)
+            snprintf(testFilename, sizeof(testFilename), "/BEAM%s_%s%02d.csv",
+                     _deviceID.c_str(), baseFilename, num);
             Serial.printf("    Testing: %s - ", testFilename);
 
             if (SD.exists(testFilename))
@@ -502,8 +548,9 @@ String HublinkBEAM::getCurrentFilename()
     uint8_t nextNum = 0;
     while (nextNum < 100)
     {
-        char testFilename[24];
-        snprintf(testFilename, sizeof(testFilename), "/BEAM_%s%02d.csv", baseFilename, nextNum);
+        char testFilename[28]; // /BEAMXXX_YYYYMMDDXX.csv (23 chars + null terminator)
+        snprintf(testFilename, sizeof(testFilename), "/BEAM%s_%s%02d.csv",
+                 _deviceID.c_str(), baseFilename, nextNum);
         Serial.printf("    Testing: %s - ", testFilename);
 
         if (!SD.exists(testFilename))
