@@ -718,10 +718,12 @@ bool HublinkBEAM::logData()
     // Format data string with new fields
     char dataString[128];
     snprintf(dataString, sizeof(dataString),
-             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%.3f,%.2f,%.2f,%.2f,%.4f,%d,%.3f,%d,%d,%.3f,%lu,%d",
+             "%04d-%02d-%02d %02d:%02d:%02d,%lu,%s,%s,%.3f,%.2f,%.2f,%.2f,%.4f,%d,%.3f,%d,%d,%.3f,%lu,%d",
              now.year(), now.month(), now.day(),
              now.hour(), now.minute(), now.second(),
              millis(),
+             _deviceID.c_str(),
+             HUBLINK_BEAM_VERSION,
              batteryV,
              tempC,
              pressHpa,
@@ -748,6 +750,8 @@ bool HublinkBEAM::logData()
     Serial.println("\n" + currentFile + ":");
     Serial.println("DateTime:    " + String(datetime));
     Serial.println("Millis:      " + String(millis()));
+    Serial.println("Device ID:   " + _deviceID);
+    Serial.println("Version:     " + String(HUBLINK_BEAM_VERSION));
     Serial.println("Battery V:   " + String(batteryV));
     Serial.println("Temp °C:     " + String(tempC));
     Serial.println("Press hPa:   " + String(pressHpa));
