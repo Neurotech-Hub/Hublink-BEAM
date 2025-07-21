@@ -105,6 +105,7 @@ void beginHublink()
 
     // Set device ID in beam library
     beam.setDeviceID(DEVICE_ID);
+    hublink.setBatteryLevel(round(beam.getBatteryPercent())); // send battery level to gateway
   }
   else
   {

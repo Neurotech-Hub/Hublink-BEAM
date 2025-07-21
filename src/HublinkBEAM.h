@@ -49,7 +49,7 @@ class DateTime;
 #define LOW_BATTERY_THRESHOLD 3.7
 
 // Library Version
-#define HUBLINK_BEAM_VERSION "2.0.9"
+#define HUBLINK_BEAM_VERSION "2.1.0"
 
 // CSV Header
 #define CSV_HEADER "datetime,millis,device_id,library_version,battery_voltage,temperature_c,pressure_hpa,humidity_percent,lux,activity_count,activity_percent,inactivity_period_s,inactivity_count,inactivity_percent,min_free_heap,reboot"
