@@ -17,6 +17,44 @@ An Arduino library for the Hublink BEAM ESP32-S3 data logging device. This libra
 - ESP32Time
 - Preferences
 
+**meta.json File Contents**
+BEAM must have a `meta.json` file present to control timing parameters (if deviating from the sketch defaults) and sync with Hublink. Several Hublink parameters are disregarded because of BEAM's deep sleep cycling: `advertise_every`, `advertise_for`, and reconnect settings are not utilized but can still be placed in the hublink structure.
+
+```
+json
+{
+  "hublink": {
+    "advertise": "HUBLINK",
+    "advertise_every": 120,
+    "advertise_for": 30,
+    "try_reconnect": false,
+    "reconnect_attempts": 2,
+    "reconnect_every": 30,
+    "upload_path": "/BEAM",
+    "append_path": "device:id",
+    "disable": false
+  },
+  "beam": {
+    "log_every_minutes": 1,
+    "sync_every_minutes": 3,
+    "sync_for_seconds": 30,
+    "new_file_on_boot": true,
+    "inactivity_period_seconds": 40
+  },
+  "subject": {
+    "id": "",
+    "strain": "",
+    "sex": "F"
+  },
+  "experiment": {
+    "name": ""
+  },
+  "device": {
+    "id": "001"
+  }
+}
+```
+
 **Testing**
 1. Ensure the power switch is in the `ON` position.
 
@@ -86,16 +124,19 @@ These indicators may be temporary during operations or flash continuously if stu
 Each log entry contains the following columns:
 - `datetime`: Current date and time (YYYY-MM-DD HH:MM:SS)
 - `millis`: Milliseconds since last boot
+- `device_id`: Device identifier (3-character alphanumeric)
+- `library_version`: Library version string
 - `battery_voltage`: Battery voltage in volts (-1.0 if sensor failed)
 - `temperature_c`: Temperature in Celsius (-273.15 if sensor failed)
 - `pressure_hpa`: Atmospheric pressure in hPa (-1.0 if sensor failed)
 - `humidity_percent`: Relative humidity percentage (-1.0 if sensor failed)
 - `lux`: Light level in lux (-1.0 if sensor failed)
-- `pir_count`: Number of motion events since last log
-- `pir_percent_active`: Fraction of time PIR was active (0-1)
+- `activity_count`: Number of motion events since last log
+- `activity_percent`: Fraction of time PIR was active (0-1)
 - `inactivity_period_s`: Configured inactivity period in seconds
 - `inactivity_count`: Number of complete inactivity periods
-- `inactivity_fraction`: Fraction of possible inactivity periods (0-1)
+- `inactivity_percent`: Fraction of possible inactivity periods (0-1)
+- `min_free_heap`: Minimum free heap memory in bytes
 - `reboot`: 1 if entry is from fresh boot, 0 if from wake from sleep
 
 ### File Creation Behavior
