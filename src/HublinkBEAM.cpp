@@ -1,6 +1,7 @@
 #include "HublinkBEAM.h"
 #include "RTCManager.h"
 #include "esp_sleep.h"
+#include "esp_mac.h"
 
 // Use RTC memory to maintain state across deep sleep
 static RTC_DATA_ATTR uint16_t alarm_interval = 0;
@@ -201,6 +202,25 @@ bool HublinkBEAM::begin()
         else
         {
             setNeoPixel(NEOPIXEL_RED); // Red for other failures
+        }
+    }
+
+    // Apply random delay if randomization is enabled and initialization succeeded
+    if (allInitialized && _alarmRandomizationMinutes > 0)
+    {
+        uint32_t hash = hashMacAddress();
+        uint16_t randomDelaySeconds = hash % (2 * _alarmRandomizationMinutes * 60 + 1);
+        Serial.printf("\nApplying random delay: %d seconds (%.1f minutes) based on MAC address\n",
+                      randomDelaySeconds, randomDelaySeconds / 60.0);
+
+        // Skip delay in debug mode (Switch A down) for faster development
+        if (!switchADown())
+        {
+            delay(randomDelaySeconds * 1000);
+        }
+        else
+        {
+            Serial.println("Debug mode: skipping random delay");
         }
     }
 
@@ -1071,4 +1091,23 @@ bool HublinkBEAM::alarm(uint16_t minutes)
 
     Serial.println("  → Not triggered");
     return false;
+}
+
+uint32_t HublinkBEAM::hashMacAddress()
+{
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_BT); // Get Bluetooth MAC address
+
+    // Print MAC address for debugging
+    Serial.printf("Device MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    // Simple hash combining all 6 bytes
+    uint32_t hash = 0;
+    for (int i = 0; i < 6; i++)
+    {
+        hash = hash * 31 + mac[i];
+    }
+
+    return hash;
 }

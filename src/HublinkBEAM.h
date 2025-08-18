@@ -75,6 +75,10 @@ public:
     void setInactivityPeriod(uint16_t seconds) { _inactivityPeriod = seconds; }
     uint16_t getInactivityPeriod() { return _inactivityPeriod; }
 
+    // Alarm randomization control
+    void setAlarmRandomization(uint16_t minutes) { _alarmRandomizationMinutes = minutes; }
+    uint16_t getAlarmRandomization() { return _alarmRandomizationMinutes; }
+
     // NeoPixel control functions
     void setNeoPixel(uint32_t color);
     void disableNeoPixel();
@@ -124,16 +128,18 @@ private:
     bool isSDCardPresent();           // Checks if SD card is inserted
     void enableSDPower();
     void disableSDPower();
+    uint32_t hashMacAddress(); // Generate hash from MAC address for randomization
     bool _isLowBattery;
-    bool _isWakeFromSleep;          // Track wake state
-    bool _newFileOnBoot = true;     // Controls whether to create new file on each boot
-    String _deviceID = "XXX";       // Device ID for filename (3 characters)
-    double _pir_percent_active;     // Track PIR activity as fraction of sleep time
-    double _inactivity_fraction;    // Track inactivity as fraction of possible periods
-    uint16_t _inactivityPeriod = 0; // Inactivity period in seconds (0 = disabled)
-    uint32_t _minFreeHeap;          // Track minimum free heap
-    uint32_t _elapsed_seconds;      // Store elapsed time for inactivity calculations
-    double _active_seconds;         // Store active time for inactivity calculations
+    bool _isWakeFromSleep;                   // Track wake state
+    bool _newFileOnBoot = true;              // Controls whether to create new file on each boot
+    String _deviceID = "XXX";                // Device ID for filename (3 characters)
+    double _pir_percent_active;              // Track PIR activity as fraction of sleep time
+    double _inactivity_fraction;             // Track inactivity as fraction of possible periods
+    uint16_t _inactivityPeriod = 0;          // Inactivity period in seconds (0 = disabled)
+    uint16_t _alarmRandomizationMinutes = 0; // Alarm randomization in minutes (0 = disabled)
+    uint32_t _minFreeHeap;                   // Track minimum free heap
+    uint32_t _elapsed_seconds;               // Store elapsed time for inactivity calculations
+    double _active_seconds;                  // Store active time for inactivity calculations
     File _dataFile;
     bool _isSDInitialized;
     ZDP323 _pirSensor;

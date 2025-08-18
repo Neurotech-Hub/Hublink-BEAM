@@ -10,6 +10,7 @@ int SYNC_EVERY_MINUTES = 30;        // Sync every X minutes
 int SYNC_FOR_SECONDS = 30;          // Sync timeout in seconds
 bool NEW_FILE_ON_BOOT = true;       // Create new file on boot
 int INACTIVITY_PERIOD_SECONDS = 40; // Inactivity period in seconds
+int RANDOMIZE_ALARM_MINUTES = 0;    // Alarm randomization in minutes (0 = disabled)
 String DEVICE_ID = "XXX";           // Default device ID (3 characters)
 
 // Hublink callback function to handle timestamp
@@ -31,8 +32,8 @@ void setup()
   beam.setNeoPixel(NEOPIXEL_OFF);
 
   // we don't check for hublink success here because we want to continue setup even if hublink fails
-  beginHublink();  // reads meta.json and overrides default values if found
-  syncOnSwitchB(); // force hublink sync if switch B is down
+  beginHublink();          // reads meta.json and overrides default values if found
+  syncUnlessSwitchBDown(); // force hublink sync if switch B is down
 
   beam.setInactivityPeriod(INACTIVITY_PERIOD_SECONDS); // 40 seconds; based on https://shorturl.at/JiZxK
   beam.setNewFileOnBoot(NEW_FILE_ON_BOOT);             // false to continue using same file if it's the same day
@@ -97,6 +98,11 @@ void beginHublink()
       INACTIVITY_PERIOD_SECONDS = hublink.getMeta<int>("beam", "inactivity_period_seconds");
       Serial.println("INACTIVITY_PERIOD_SECONDS: " + String(INACTIVITY_PERIOD_SECONDS));
     }
+    if (hublink.hasMetaKey("beam", "randomize_alarm_minutes"))
+    {
+      RANDOMIZE_ALARM_MINUTES = hublink.getMeta<int>("beam", "randomize_alarm_minutes");
+      Serial.println("RANDOMIZE_ALARM_MINUTES: " + String(RANDOMIZE_ALARM_MINUTES));
+    }
     if (hublink.hasMetaKey("device", "id"))
     {
       DEVICE_ID = hublink.getMeta<String>("device", "id");
@@ -105,6 +111,7 @@ void beginHublink()
 
     // Set device ID in beam library
     beam.setDeviceID(DEVICE_ID);
+    beam.setAlarmRandomization(RANDOMIZE_ALARM_MINUTES);
     hublink.setBatteryLevel(round(beam.getBatteryPercent())); // send battery level to gateway
   }
   else
@@ -114,33 +121,48 @@ void beginHublink()
   }
 }
 
-void syncOnSwitchB()
+void syncUnlessSwitchBDown()
 {
-  if (beam.switchBDown())
+  if (!beam.switchBDown())
   {
     bool didSync = false;
-    Serial.println("Switch B pressed - entering sync mode");
-    while (beam.switchBDown())
+    Serial.println("Switch B not pressed - entering force sync mode");
+
+    while (!didSync && !beam.switchBDown())
     {
-      if (!didSync)
+      Serial.println("Starting sync...");
+      beam.setNeoPixel(NEOPIXEL_RED);
+      didSync = hublink.sync(SYNC_FOR_SECONDS);
+      beam.setNeoPixel(NEOPIXEL_OFF);
+      Serial.printf("Sync %s\n", didSync ? "successful" : "failed");
+
+      if (!didSync && !beam.switchBDown())
       {
-        Serial.println("Starting sync...");
-        beam.setNeoPixel(NEOPIXEL_RED);
-        didSync = hublink.sync(SYNC_FOR_SECONDS);
-        beam.setNeoPixel(NEOPIXEL_OFF);
-        Serial.printf("Sync %s\n", didSync ? "successful" : "failed");
-        delay(200);
-      }
-      else
-      {
-        // blink white after sync is successful
-        Serial.println("Sync complete - blinking LED");
-        beam.setNeoPixel(NEOPIXEL_WHITE);
-        delay(100);
-        beam.setNeoPixel(NEOPIXEL_OFF);
-        hublink.sleep(2); // esp light sleep for 2 seconds
+        delay(1000); // Wait before retry (but check switch during delay too)
+        // Check switch state during the delay period
+        for (int i = 0; i < 10 && !beam.switchBDown(); i++)
+        {
+          delay(100);
+        }
       }
     }
-    Serial.println("Switch B released - exiting sync mode");
+
+    if (didSync)
+    {
+      // Brief white flash to indicate successful sync
+      Serial.println("Sync complete - exiting sync mode");
+      beam.setNeoPixel(NEOPIXEL_WHITE);
+      delay(200);
+      beam.setNeoPixel(NEOPIXEL_OFF);
+    }
+    else
+    {
+      // Switch was pressed during sync attempts
+      Serial.println("Switch B pressed - aborting sync attempts");
+    }
+  }
+  else
+  {
+    Serial.println("Switch B pressed - skipping sync");
   }
 }

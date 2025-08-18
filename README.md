@@ -39,7 +39,8 @@ json
     "sync_every_minutes": 3,
     "sync_for_seconds": 30,
     "new_file_on_boot": true,
-    "inactivity_period_seconds": 40
+    "inactivity_period_seconds": 40,
+    "randomize_alarm_minutes": 1
   },
   "subject": {
     "id": "",
@@ -183,6 +184,37 @@ beam.setInactivityPeriod(40); // 40 seconds of immobility indicates sleep
 ```
 
 The 40-second threshold is based on research by [Brown et al. (2017)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5140024/) which demonstrated that extended immobility of >40 seconds provides a reliable indicator of sleep, correlating well with EEG-defined sleep (Pearson's r >0.95, n=4 mice).
+
+### Alarm Randomization
+To prevent multiple devices from syncing simultaneously (which can cause network collisions), the library supports alarm randomization:
+
+```cpp
+beam.setAlarmRandomization(1); // Randomize alarm timing by ±1 minute
+```
+
+**Configuration via meta.json:**
+```json
+{
+  "beam": {
+    "randomize_alarm_minutes": 1
+  }
+}
+```
+
+**How it works:**
+- Each device generates a unique, consistent delay based on its MAC address
+- Random delay ranges from 0 to (2 × `randomize_alarm_minutes`) minutes  
+- Applied during device initialization after successful sensor setup
+- Same device always uses the same delay (deterministic based on hardware)
+- Default value of 0 disables randomization (backward compatible)
+- Debug mode (Switch A down) skips the delay for faster development
+
+**Example with `randomize_alarm_minutes: 1`:**
+- Device A (MAC: AA:BB:CC...): Always delays 23 seconds on boot
+- Device B (MAC: 11:22:33...): Always delays 47 seconds on boot  
+- Device C (MAC: FF:EE:DD...): Always delays 8 seconds on boot
+
+This spreads sync operations across a 0-2 minute window, eliminating collisions when multiple devices wake simultaneously.
 
 ### ULP Operation
 - ULP program continuously monitors the PIR sensor
