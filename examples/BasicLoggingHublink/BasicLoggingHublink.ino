@@ -32,8 +32,17 @@ void setup()
   beam.setNeoPixel(NEOPIXEL_OFF);
 
   // we don't check for hublink success here because we want to continue setup even if hublink fails
-  beginHublink();          // reads meta.json and overrides default values if found
-  syncUnlessSwitchBDown(); // force hublink sync if switch B is down
+  beginHublink(); // reads meta.json and overrides default values if found
+
+  // Only attempt sync on boot/reboot, not when waking from deep sleep
+  if (!beam.isWakeFromSleep())
+  {
+    syncUnlessSwitchBDown(); // force hublink sync if switch B is down
+  }
+  else
+  {
+    Serial.println("Wake from sleep - skipping force sync check");
+  }
 
   beam.setInactivityPeriod(INACTIVITY_PERIOD_SECONDS); // 40 seconds; based on https://shorturl.at/JiZxK
   beam.setNewFileOnBoot(NEW_FILE_ON_BOOT);             // false to continue using same file if it's the same day
@@ -131,20 +140,10 @@ void syncUnlessSwitchBDown()
     while (!didSync && !beam.switchBDown())
     {
       Serial.println("Starting sync...");
-      beam.setNeoPixel(NEOPIXEL_RED);
+      beam.setNeoPixel(NEOPIXEL_WHITE);
       didSync = hublink.sync(SYNC_FOR_SECONDS);
       beam.setNeoPixel(NEOPIXEL_OFF);
       Serial.printf("Sync %s\n", didSync ? "successful" : "failed");
-
-      if (!didSync && !beam.switchBDown())
-      {
-        delay(1000); // Wait before retry (but check switch during delay too)
-        // Check switch state during the delay period
-        for (int i = 0; i < 10 && !beam.switchBDown(); i++)
-        {
-          delay(100);
-        }
-      }
     }
 
     if (didSync)

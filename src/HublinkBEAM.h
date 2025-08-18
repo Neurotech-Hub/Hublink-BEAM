@@ -119,6 +119,7 @@ public:
 
     bool switchADown();
     bool switchBDown();
+    bool isWakeFromSleep() { return _isWakeFromSleep; }
 
 private:
     void initPins();

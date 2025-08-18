@@ -117,6 +117,7 @@ These indicators may be temporary during operations or flash continuously if stu
 - Red: Error (SD card or sensor failure)
 - Green: Motion detected (during data logging)
 - Purple: Low battery
+- White: Hublink sync on boot (attempt is _ongoing_)
 - Off: Normal operation
 
 ## Data Logging
