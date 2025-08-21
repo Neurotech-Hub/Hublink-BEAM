@@ -120,6 +120,27 @@ These indicators may be temporary during operations or flash continuously if stu
 - White: Hublink sync on boot (attempt is _ongoing_)
 - Off: Normal operation
 
+### Battery Protection
+The device implements intelligent battery protection to prevent over-discharge while maintaining operational reliability:
+
+**Low Battery Threshold: 3.7V**
+
+**First Boot/Power-On:**
+- Battery < 3.7V: **Device will not start** (purple LED, initialization failure)
+- Protects battery from deep discharge damage
+- Switch A down (debug mode): Bypasses protection for development/testing
+
+**Wake from Deep Sleep:**
+- Battery < 3.7V: **Device continues operation** (logs low battery state)
+- Ensures continuous data collection even if battery drops during use
+- Allows device to complete current logging cycle and save data
+
+**Benefits:**
+- Prevents battery damage from over-discharge on startup
+- Maintains data integrity during normal operation
+- Clear visual indicators (purple LED) for low battery state
+- Debug override available for development work
+
 ## Data Logging
 
 ### CSV Format
@@ -169,7 +190,7 @@ If the SD card is cleared or files are deleted:
 On power-up or reset, the device:
 1. Stops any running ULP program to free GPIO pins
 2. Initializes pins and I2C power
-3. Checks battery voltage (purple LED if battery < 3.4V)
+3. Checks battery voltage (purple LED and initialization failure if battery < 3.7V on first boot)
 4. Initializes SD card (must be present)
 5. Sets up sensors and RTC
 6. Creates a new log file with today's date and next available number
