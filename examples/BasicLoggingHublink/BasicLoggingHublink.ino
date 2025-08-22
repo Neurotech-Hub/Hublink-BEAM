@@ -169,9 +169,9 @@ void syncUnlessSwitchBDown()
       Serial.println("Starting sync...");
       beam.setNeoPixel(NEOPIXEL_WHITE); // White LED during sync attempt
       hublink.setBatteryLevel(round(beam.getBatteryPercent()));
-      didSync = hublink.sync(SYNC_FOR_SECONDS);
+      didSync = hublink.sync(30); // 30s on
       beam.setNeoPixel(NEOPIXEL_OFF);
-      delay(10000); // allow other devices to advertise/sync
+      delay(30000); // 30s off, allow other devices to advertise/sync
       Serial.printf("Sync %s\n", didSync ? "successful" : "failed");
     }
 
