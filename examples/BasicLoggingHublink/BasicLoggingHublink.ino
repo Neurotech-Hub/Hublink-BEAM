@@ -136,7 +136,6 @@ void beginHublink()
     // Set device ID in beam library
     beam.setDeviceID(DEVICE_ID);
     beam.setAlarmRandomization(RANDOMIZE_ALARM_MINUTES);
-    hublink.setBatteryLevel(round(beam.getBatteryPercent())); // send battery level to gateway
   }
   else
   {
@@ -169,8 +168,10 @@ void syncUnlessSwitchBDown()
     {
       Serial.println("Starting sync...");
       beam.setNeoPixel(NEOPIXEL_WHITE); // White LED during sync attempt
+      hublink.setBatteryLevel(round(beam.getBatteryPercent()));
       didSync = hublink.sync(SYNC_FOR_SECONDS);
       beam.setNeoPixel(NEOPIXEL_OFF);
+      delay(10000); // allow other devices to advertise/sync
       Serial.printf("Sync %s\n", didSync ? "successful" : "failed");
     }
 
