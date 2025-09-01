@@ -24,6 +24,7 @@
         "istream": "cpp",
         "locale": "cpp",
         "streambuf": "cpp",
-        "*.tcc": "cpp"
+        "*.tcc": "cpp",
+        "cmath": "cpp"
     }
 }

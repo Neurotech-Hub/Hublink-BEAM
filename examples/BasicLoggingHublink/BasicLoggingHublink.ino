@@ -136,6 +136,7 @@ void beginHublink()
     // Set device ID in beam library
     beam.setDeviceID(DEVICE_ID);
     beam.setAlarmRandomization(RANDOMIZE_ALARM_MINUTES);
+    hublink.setBatteryLevel(round(beam.getBatteryPercent()));
   }
   else
   {
